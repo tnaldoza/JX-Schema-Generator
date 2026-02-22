@@ -1,8 +1,9 @@
 # JXSchemaGenerator
 
 A .NET CLI tool that parses JXChange XSD schema files and generates JSON element mapping files.
-These files are consumed by API client utilities (InquiryElements.js, etc.) to resolve which
-extended elements (x_ prefixed) and their tags should be included in JXChange API requests.
+These files are consumed by API client utilities (`EntitySchemaHelper.ts`, etc.) to resolve which
+extended elements (`x_` prefixed) should be included in JXChange SOAP requests, and how to
+build modification request bodies.
 
 ---
 
@@ -13,60 +14,306 @@ extended elements (x_ prefixed) and their tags should be included in JXChange AP
 
 ---
 
-## Usage
+## Commands
+
+### `generate`
+
+Processes master XSD files and writes JSON element mapping files to the output folder.
 
 ```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input <SchemaFolder> [--root <RootXsdFile>] [--out <OutputFolder>] [--strict true|false]
+dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input <SchemaFolder> [--root <XsdFile>] [--out <OutputFolder>] [--strict true|false]
+```
+
+### `detect`
+
+Analyses a master XSD and prints a config recommendation report with exact tag counts.
+Use this when adding a new XSD to determine what config entries are needed.
+
+```
+dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input <SchemaFolder> [--root <XsdFile>] [--strict true|false]
 ```
 
 **Arguments**
 
-| Argument  | Required | Default     | Description                                              |
-|-----------|----------|-------------|----------------------------------------------------------|
-| --input   | yes      |             | Folder containing all XSD files                          |
-| --root    | no       |             | Single XSD file to process. Omit to process all masters  |
-| --out     | no       | .\artifacts | Output folder for generated JSON                         |
-| --strict  | no       | true        | Fail on schema compile errors                            |
+| Argument  | Required | Default       | Description                                             |
+|-----------|----------|---------------|---------------------------------------------------------|
+| `--input` | yes      |               | Folder containing all XSD files                         |
+| `--root`  | no       |               | Single XSD file to process. Omit to process all masters |
+| `--out`   | no       | `.\artifacts` | Output folder for generated JSON (`generate` only)      |
+| `--strict`| no       | `true`        | Fail on schema compile errors                           |
 
-**Process all master XSDs automatically**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --out .\artifacts
-```
-
-**Process a single XSD**
+**Examples**
 
 ```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_InquiryMaster.xsd --out .\artifacts
+# Process all registered master XSDs
+dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --out .\artifacts
+
+# Process a single XSD
+dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --root tpg_depositmaster.xsd --out .\artifacts
+
+# Detect config needed for a new XSD
+dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input .\schemas --root tpg_newmaster.xsd
 ```
 
 ---
 
-## Output
+## JXChange Operation Type Naming Convention
 
-All output files share the same top-level structure and use `entityTypes` as the
-uniform collection key regardless of domain.
+Every JXChange operation follows a strict naming convention based on the operation type:
 
-| Root XSD                  | Output File(s)                                              |
-|---------------------------|-------------------------------------------------------------|
-| TPG_InquiryMaster.xsd     | inquiryElements.json                                        |
-| TPG_CustomerMaster.xsd    | customerElements.json, customerModificationElements.json    |
-| TPG_DepositMaster.xsd     | depositModificationElements.json                            |
-| TPG_LoanMaster.xsd        | loanModificationElements.json                               |
+| Suffix       | Meaning                          | Example                    |
+|--------------|----------------------------------|----------------------------|
+| `*InqRq_MType` | Inquiry request envelope        | `AcctInqRq_MType`          |
+| `*InqRs_MType` | Inquiry response envelope       | `AcctInqRs_MType`          |
+| `*SrchRq_MType`| Search request envelope         | `XferSrchRq_MType`         |
+| `*SrchRs_MType`| Search response envelope        | `XferSrchRs_MType`         |
+| `*SrchRec_CType`| Search result record            | `XferSrchRec_CType`        |
+| `*ModRq_MType` | Modification request envelope   | `AcctSweepModRq_MType`     |
+| `*ModRs_MType` | Modification response envelope  | `AcctSweepModRs_MType`     |
+
+### Rq → Rs derivation
+
+The response type for any operation is derived by swapping the `Rq` suffix to `Rs`:
+
+```
+AcctInqRq_MType   →  strip "Rq_MType"  →  "AcctInq"   →  append "Rs_MType"  →  AcctInqRs_MType
+XferSrchRq_MType  →  strip "Rq_MType"  →  "XferSrch"  →  append "Rs_MType"  →  XferSrchRs_MType
+```
+
+The element name (the key used in output JSON) is the stripped middle portion:
+`AcctInqRq_MType` → element name `AcctInq`.
+
+### Search record derivation
+
+Search response records follow a different pattern — they use `Rec_CType` not `Rs_MType`:
+
+```
+XferSrchRq_MType  →  strip "Rq_MType"  →  "XferSrch"  →  append "Rec_CType"  →  XferSrchRec_CType
+```
+
+---
+
+## Four Operation Families
+
+The generator handles three distinct operation families, each with its own generator and config type.
+
+### Inquiry (`*InqRq_MType`)
+
+**Auto-discovered** — no regex or manual type mapping needed.
+
+- Scans for all `*InqRq_MType` complex types in the XSD
+- Derives the element name by stripping `Rq_MType` (e.g. `AcctSweepInqRq_MType` → `AcctSweepInq`)
+- Expands the request type (minus `MsgRqHdr`) into `requestSchema`
+- Looks up the matching `*InqRs_MType` response type and expands it (minus `MsgRsHdr`) into `responseSchema`
+- Patches `IncXtendElemArray.IncXtendElemInfo.XtendElem` in the request schema with the valid `x_*`
+  element names collected from the response schema (see [Extended Elements](#extended-elements))
+- Output key: `inquiryOperations`
+
+### Search (`*SrchRq_MType`)
+
+**Auto-discovered** — no regex or manual type mapping needed.
+
+- Scans for all `*SrchRq_MType` complex types in the XSD
+- Derives the element name by stripping `Rq_MType` (e.g. `XferSrchRq_MType` → `XferSrch`)
+- Expands the request type (minus `SrchMsgRqHdr`) into `requestSchema`
+- Looks up the matching `*SrchRec_CType` response record type and expands it into `responseRecordSchema`
+- Output key: `searchOperations`
+
+### Add (`*AddRq_MType`)
+
+**Auto-discovered** — no regex or manual type mapping needed.
+
+- Scans for all `*AddRq_MType` complex types in the XSD
+- Derives the element name by stripping `Rq_MType` (e.g. `CustAddRq_MType` → `CustAdd`)
+- Expands the request type (minus `MsgRqHdr`) into `requestSchema`
+- Looks up the matching `*AddRs_MType` response type and expands it (minus `MsgRsHdr`) into `responseSchema`
+- No `IncXtendElemArray` patching — Add operations do not use the extended element mechanism
+- Output key: `addOperations`
+
+> **Note:** `*ValidateRq_MType` operations (e.g. `XferAddValidate`) wrap an Add request as a
+> child element and are not separately generated — their field shape is identical to the Add counterpart.
+
+### Modification (`*ModRq_MType`)
+
+**Manually configured** — requires `ContainerTypeRegex`, `TypeToEntry`, and `OutputOrder` in
+`ModificationDomainConfig.cs` because operations must be grouped into output files and entity
+type keys (e.g. `D`, `L`) with aliases cannot be derived from the XSD alone.
+
+- Scans for `*ModRq_MType` types matching the config regex
+- Locates the `*Mod_CType` child (nested pattern) or uses direct children (flat pattern) as sections
+- Expands each section into a hierarchical `schema` tree
+- Output key: `entityTypes`
+
+---
+
+## Extended Elements (`x_*`)
+
+JXChange uses `x_` prefixed elements as optional data bundles. You only receive the data for
+bundles you explicitly request. The mechanism:
+
+1. In the **request**, include `IncXtendElemArray.IncXtendElemInfo.XtendElem` listing the
+   `x_*` element names you want
+2. In the **response**, those `x_*` elements are populated with their fields
+
+The inquiry generator automatically patches `XtendElem` in the generated `requestSchema` with
+every valid `x_*` name found anywhere in the corresponding `responseSchema`. This gives consumers
+a ready-made enumeration of what can be requested.
+
+For account inquiry (`AcctInq`), the response schema groups `x_*` elements by account type record:
+
+```
+responseSchema
+  DepAcctInqRec        ← deposit/checking/savings accounts
+    x_DepInfoRec
+    x_DepAcctInfo
+    ...
+  LnAcctInqRec         ← loan accounts
+    x_LnInfoRec
+    x_LnAcctInfo
+    ...
+  TimeDepAcctInqRec    ← time deposit / CD accounts
+    ...
+```
+
+For non-account inquiry (`CustInq`), `x_*` elements appear directly in `responseSchema`:
+
+```
+responseSchema
+  x_BusDetail
+  x_RegDetail
+  x_TaxDetail
+  ...
+```
+
+---
+
+## Output Files
+
+Each registered XSD produces up to three files — one per generator family.
+
+| Root XSD                      | Inquiry output                    | Add output                        | Search output                    | Modification output                       |
+|-------------------------------|-----------------------------------|-----------------------------------|----------------------------------|-------------------------------------------|
+| `tpg_inquirymaster.xsd`       | `inquiryElements.json`            | —                                 | `inquirySearchElements.json`     | —                                         |
+| `tpg_customermaster.xsd`      | `customerInquiryElements.json`    | `customerAddElements.json`        | `customerSearchElements.json`    | `customerModificationElements.json`       |
+| `tpg_depositmaster.xsd`       | `depositInquiryElements.json`     | `depositAddElements.json`         | `depositSearchElements.json`     | `depositModificationElements.json`        |
+| `tpg_loanmaster.xsd`          | `loanInquiryElements.json`        | `loanAddElements.json`            | `loanSearchElements.json`        | `loanModificationElements.json`           |
+| `tpg_achmaster.xsd`           | `achInquiryElements.json`         | `achAddElements.json`             | `achSearchElements.json`         | `achModificationElements.json`            |
+| `tpg_billpaymaster.xsd`       | `billPayInquiryElements.json`     | `billPayAddElements.json`         | `billPaySearchElements.json`     | `billPayModificationElements.json`        |
+| `tpg_crcardmaster.xsd`        | `crCardInquiryElements.json`      | `crCardAddElements.json`          | `crCardSearchElements.json`      | `crCardModificationElements.json`         |
+| `tpg_ensmaster.xsd`           | `ensInquiryElements.json`         | `ensAddElements.json`             | `ensSearchElements.json`         | `ensModificationElements.json`            |
+| `tpg_imagemaster.xsd`         | `imageInquiryElements.json`       | `imageAddElements.json`           | `imageSearchElements.json`       | `imageModificationElements.json`          |
+| `tpg_imsmaster.xsd`           | `imsInquiryElements.json`         | `imsAddElements.json`             | `imsSearchElements.json`         | `imsModificationElements.json`            |
+| `tpg_tellermaster.xsd`        | `tellerInquiryElements.json`      | `tellerAddElements.json`          | `tellerSearchElements.json`      | `tellerModificationElements.json`         |
+| `tpg_wiremaster.xsd`          | `wireInquiryElements.json`        | `wireAddElements.json`            | `wireSearchElements.json`        | `wireModificationElements.json`           |
+| `tpg_custommaster.xsd`        | `customInquiryElements.json`      | `customAddElements.json`          | `customSearchElements.json`      | `customModificationElements.json`         |
+| `tpg_transactionmaster.xsd`   | —                                 | `transactionAddElements.json`     | —                                | `transactionModificationElements.json`    |
+| `tpg_brdcstmaster.xsd`        | —                                 | —                                 | `brdCstSearchElements.json`      | —                                         |
+| `tpg_workflowmaster.xsd`      | —                                 | —                                 | `workflowSearchElements.json`    | —                                         |
+
+---
+
+## Output Formats
+
+### Inquiry file
 
 ```json
 {
   "version": "1.0.0",
-  "lastUpdated": "2026-02-21",
+  "lastUpdated": "2026-02-22",
+  "inquiryOperations": {
+    "AcctInq": {
+      "name": "AcctInq",
+      "requestSchema": {
+        "InAcctId": { "AcctId": null, "AcctType": null },
+        "IncXtendElemArray": {
+          "IncXtendElemInfo": {
+            "XtendElem": ["x_DepAcctInfo", "x_DepInfoRec", "x_LnInfoRec", "..."]
+          }
+        }
+      },
+      "responseSchema": {
+        "DepAcctInqRec": {
+          "x_DepInfoRec": { "AcctId": null, "AcctStat": null, "..." : null },
+          "x_DepAcctInfo": { "..." : null }
+        },
+        "LnAcctInqRec": {
+          "x_LnInfoRec": { "AcctId": null, "..." : null }
+        }
+      }
+    },
+    "CustInq": {
+      "name": "CustInq",
+      "requestSchema": { "..." : null },
+      "responseSchema": {
+        "x_BusDetail": { "OffCode": null, "..." : null },
+        "x_RegDetail": { "DoNotCallCode": null, "..." : null }
+      }
+    }
+  }
+}
+```
+
+### Search file
+
+```json
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-02-22",
+  "searchOperations": {
+    "XferSrch": {
+      "name": "XferSrch",
+      "requestSchema": {
+        "AcctId": null,
+        "AcctType": null,
+        "SrchMsgRqHdr": null
+      },
+      "responseRecordSchema": {
+        "XferSrchRec": {
+          "AcctId": null,
+          "XferAmt": null,
+          "XferDt": null
+        }
+      }
+    }
+  }
+}
+```
+
+### Modification file
+
+```json
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-02-22",
   "entityTypes": {
+    "Cust": {
+      "name": "Customer",
+      "aliases": [],
+      "modificationStructure": "",
+      "modificationSections": [
+        {
+          "name": "CustDetail",
+          "schema": {
+            "EmailArray": {
+              "isArray": true,
+              "EmailInfo": {
+                "EmailAddr": null,
+                "EmailType": null
+              }
+            },
+            "DoNotCallCode": null
+          }
+        }
+      ]
+    },
     "D": {
       "name": "Deposit/Checking/Savings",
       "aliases": ["S", "X"],
-      "extendedElements": [
+      "modificationStructure": "DepMod",
+      "modificationSections": [
         {
-          "name": "x_DepInfoRec",
-          "description": null,
-          "tags": ["AcctId", "AcctStat", "BrCode", "..."]
+          "name": "DepInfoRec",
+          "schema": { "AcctTitle": null, "..." : null }
         }
       ]
     }
@@ -74,1077 +321,164 @@ uniform collection key regardless of domain.
 }
 ```
 
----
-
-## Supported Domains
-
-### Inquiry (TPG_InquiryMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| L   | Loan                     | O       |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Customer (TPG_CustomerMaster.xsd)
-
-| Key  | Name     | Aliases |
-|------|----------|---------|
-| Cust | Customer |         |
-
-### Deposit Modification (TPG_DepositMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Loan Modification (TPG_LoanMaster.xsd)
-
-| Key | Name | Aliases |
-|-----|------|---------|
-| L   | Loan | O       |
+The `isArray: true` marker on a node indicates that its parent element is an XML array wrapper
+(e.g. `EmailArray`). `ModificationBuilder` uses this to correctly build repeated items.
 
 ---
 
-## Adding a New Domain
+## Config Files
 
-### Step 1 - Identify the XSD pattern
+### `OperationConfig.cs` — Inquiry and Search
 
-Run these three commands against the target XSD. The output determines which
-config type to use and what values to supply.
-
-**Command 1 - Find which complex types own x_ elements**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern '"x_[A-Za-z]' |
-    ForEach-Object {
-        $lines = Get-Content $_.Path
-        $lines[0..($_.LineNumber-2)] | Select-String 'complexType name=' | Select-Object -Last 1
-    } | Sort-Object -Unique
-```
-
-Look at the type names returned. They tell you the container shape.
-
-**Command 2 - Find all top-level response and request container types**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern 'complexType name="[A-Za-z]+(Rq|Rs)_MType"' |
-    Select-Object -First 20
-```
-
-Use this to confirm whether the file is inquiry-side (Rs), modification-side (Rq), or both.
-
-**Command 3 - Inspect a specific container type in full**
-
-```powershell
-$typeName = "DepAcctModRq_MType"
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern "complexType name=""$typeName""" |
-    ForEach-Object { Get-Content $_.Path | Select-Object -Skip ($_.LineNumber - 1) -First 50 }
-```
-
-Replace the type name with one found in Commands 1 or 2.
-
----
-
-### Step 2 - Determine the config type
-
-Use the table below to classify the XSD based on what Commands 1 and 2 returned.
-
-| What you see in the output       | Config type to use        | Class to add entry to      |
-|----------------------------------|---------------------------|----------------------------|
-| `*AcctInqRec_CType` containers   | Inquiry / XElement config | `DomainConfigs`            |
-| Single `*InqRs_MType` container  | Inquiry / XElement config | `DomainConfigs`            |
-| `*AcctModRq_MType` containers    | Modification config       | `ModificationDomainConfigs`|
-| Single `*ModRq_MType` container  | Modification config       | `ModificationDomainConfigs`|
-| Only Add/Ext/Ren/Pmt types       | No config needed          | n/a                        |
-| Mix of Rq and Rs with x_         | Both config types         | Both classes               |
-
----
-
-### Step 3 - Determine the regex pattern
-
-Use the table below to choose the right regex based on the container type names found.
-
-| Container type name pattern                  | Regex to use                                    | Notes                          |
-|----------------------------------------------|-------------------------------------------------|--------------------------------|
-| `DepAcctInqRec_CType`, `LnAcctInqRec_CType`  | `^(?<key>[A-Za-z]+)AcctInqRec_CType# JXSchemaGenerator
-
-A .NET CLI tool that parses JXChange XSD schema files and generates JSON element mapping files.
-These files are consumed by API client utilities (InquiryElements.js, etc.) to resolve which
-extended elements (x_ prefixed) and their tags should be included in JXChange API requests.
-
----
-
-## Requirements
-
-- .NET 10 SDK
-- JXChange XSD schema files in a local folder
-
----
-
-## Usage
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input <SchemaFolder> [--root <RootXsdFile>] [--out <OutputFolder>] [--strict true|false]
-```
-
-**Arguments**
-
-| Argument  | Required | Default     | Description                                              |
-|-----------|----------|-------------|----------------------------------------------------------|
-| --input   | yes      |             | Folder containing all XSD files                          |
-| --root    | no       |             | Single XSD file to process. Omit to process all masters  |
-| --out     | no       | .\artifacts | Output folder for generated JSON                         |
-| --strict  | no       | true        | Fail on schema compile errors                            |
-
-**Process all master XSDs automatically**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --out .\artifacts
-```
-
-**Process a single XSD**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_InquiryMaster.xsd --out .\artifacts
-```
-
----
-
-## Output
-
-All output files share the same top-level structure and use `entityTypes` as the
-uniform collection key regardless of domain.
-
-| Root XSD                  | Output File(s)                                              |
-|---------------------------|-------------------------------------------------------------|
-| TPG_InquiryMaster.xsd     | inquiryElements.json                                        |
-| TPG_CustomerMaster.xsd    | customerElements.json, customerModificationElements.json    |
-| TPG_DepositMaster.xsd     | depositModificationElements.json                            |
-| TPG_LoanMaster.xsd        | loanModificationElements.json                               |
-
-```json
-{
-  "version": "1.0.0",
-  "lastUpdated": "2026-02-21",
-  "entityTypes": {
-    "D": {
-      "name": "Deposit/Checking/Savings",
-      "aliases": ["S", "X"],
-      "extendedElements": [
-        {
-          "name": "x_DepInfoRec",
-          "description": null,
-          "tags": ["AcctId", "AcctStat", "BrCode", "..."]
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Supported Domains
-
-### Inquiry (TPG_InquiryMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| L   | Loan                     | O       |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Customer (TPG_CustomerMaster.xsd)
-
-| Key  | Name     | Aliases |
-|------|----------|---------|
-| Cust | Customer |         |
-
-### Deposit Modification (TPG_DepositMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Loan Modification (TPG_LoanMaster.xsd)
-
-| Key | Name | Aliases |
-|-----|------|---------|
-| L   | Loan | O       |
-
----
-
-## Adding a New Domain
-
-### Step 1 - Identify the XSD pattern
-
-Run these three commands against the target XSD. The output determines which
-config type to use and what values to supply.
-
-**Command 1 - Find which complex types own x_ elements**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern '"x_[A-Za-z]' |
-    ForEach-Object {
-        $lines = Get-Content $_.Path
-        $lines[0..($_.LineNumber-2)] | Select-String 'complexType name=' | Select-Object -Last 1
-    } | Sort-Object -Unique
-```
-
-Look at the type names returned. They tell you the container shape.
-
-**Command 2 - Find all top-level response and request container types**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern 'complexType name="[A-Za-z]+(Rq|Rs)_MType"' |
-    Select-Object -First 20
-```
-
-Use this to confirm whether the file is inquiry-side (Rs), modification-side (Rq), or both.
-
-**Command 3 - Inspect a specific container type in full**
-
-```powershell
-$typeName = "DepAcctModRq_MType"
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern "complexType name=""$typeName""" |
-    ForEach-Object { Get-Content $_.Path | Select-Object -Skip ($_.LineNumber - 1) -First 50 }
-```
-
-Replace the type name with one found in Commands 1 or 2.
-
----
-
-### Step 2 - Determine the config type
-
-Use the table below to classify the XSD based on what Commands 1 and 2 returned.
-
-| What you see in the output       | Config type to use        | Class to add entry to      |
-|----------------------------------|---------------------------|----------------------------|
-| `*AcctInqRec_CType` containers   | Inquiry / XElement config | `DomainConfigs`            |
-| Single `*InqRs_MType` container  | Inquiry / XElement config | `DomainConfigs`            |
-| `*AcctModRq_MType` containers    | Modification config       | `ModificationDomainConfigs`|
-| Single `*ModRq_MType` container  | Modification config       | `ModificationDomainConfigs`|
-| Only Add/Ext/Ren/Pmt types       | No config needed          | n/a                        |
-| Mix of Rq and Rs with x_         | Both config types         | Both classes               |
-
----
-
-          | Multiple prefixes, one regex   |
-| `CustInqRs_MType`                            | `^(?<key>Cust)InqRs_MType# JXSchemaGenerator
-
-A .NET CLI tool that parses JXChange XSD schema files and generates JSON element mapping files.
-These files are consumed by API client utilities (InquiryElements.js, etc.) to resolve which
-extended elements (x_ prefixed) and their tags should be included in JXChange API requests.
-
----
-
-## Requirements
-
-- .NET 10 SDK
-- JXChange XSD schema files in a local folder
-
----
-
-## Usage
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input <SchemaFolder> [--root <RootXsdFile>] [--out <OutputFolder>] [--strict true|false]
-```
-
-**Arguments**
-
-| Argument  | Required | Default     | Description                                              |
-|-----------|----------|-------------|----------------------------------------------------------|
-| --input   | yes      |             | Folder containing all XSD files                          |
-| --root    | no       |             | Single XSD file to process. Omit to process all masters  |
-| --out     | no       | .\artifacts | Output folder for generated JSON                         |
-| --strict  | no       | true        | Fail on schema compile errors                            |
-
-**Process all master XSDs automatically**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --out .\artifacts
-```
-
-**Process a single XSD**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_InquiryMaster.xsd --out .\artifacts
-```
-
----
-
-## Output
-
-All output files share the same top-level structure and use `entityTypes` as the
-uniform collection key regardless of domain.
-
-| Root XSD                  | Output File(s)                                              |
-|---------------------------|-------------------------------------------------------------|
-| TPG_InquiryMaster.xsd     | inquiryElements.json                                        |
-| TPG_CustomerMaster.xsd    | customerElements.json, customerModificationElements.json    |
-| TPG_DepositMaster.xsd     | depositModificationElements.json                            |
-| TPG_LoanMaster.xsd        | loanModificationElements.json                               |
-
-```json
-{
-  "version": "1.0.0",
-  "lastUpdated": "2026-02-21",
-  "entityTypes": {
-    "D": {
-      "name": "Deposit/Checking/Savings",
-      "aliases": ["S", "X"],
-      "extendedElements": [
-        {
-          "name": "x_DepInfoRec",
-          "description": null,
-          "tags": ["AcctId", "AcctStat", "BrCode", "..."]
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Supported Domains
-
-### Inquiry (TPG_InquiryMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| L   | Loan                     | O       |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Customer (TPG_CustomerMaster.xsd)
-
-| Key  | Name     | Aliases |
-|------|----------|---------|
-| Cust | Customer |         |
-
-### Deposit Modification (TPG_DepositMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Loan Modification (TPG_LoanMaster.xsd)
-
-| Key | Name | Aliases |
-|-----|------|---------|
-| L   | Loan | O       |
-
----
-
-## Adding a New Domain
-
-### Step 1 - Identify the XSD pattern
-
-Run these three commands against the target XSD. The output determines which
-config type to use and what values to supply.
-
-**Command 1 - Find which complex types own x_ elements**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern '"x_[A-Za-z]' |
-    ForEach-Object {
-        $lines = Get-Content $_.Path
-        $lines[0..($_.LineNumber-2)] | Select-String 'complexType name=' | Select-Object -Last 1
-    } | Sort-Object -Unique
-```
-
-Look at the type names returned. They tell you the container shape.
-
-**Command 2 - Find all top-level response and request container types**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern 'complexType name="[A-Za-z]+(Rq|Rs)_MType"' |
-    Select-Object -First 20
-```
-
-Use this to confirm whether the file is inquiry-side (Rs), modification-side (Rq), or both.
-
-**Command 3 - Inspect a specific container type in full**
-
-```powershell
-$typeName = "DepAcctModRq_MType"
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern "complexType name=""$typeName""" |
-    ForEach-Object { Get-Content $_.Path | Select-Object -Skip ($_.LineNumber - 1) -First 50 }
-```
-
-Replace the type name with one found in Commands 1 or 2.
-
----
-
-### Step 2 - Determine the config type
-
-Use the table below to classify the XSD based on what Commands 1 and 2 returned.
-
-| What you see in the output       | Config type to use        | Class to add entry to      |
-|----------------------------------|---------------------------|----------------------------|
-| `*AcctInqRec_CType` containers   | Inquiry / XElement config | `DomainConfigs`            |
-| Single `*InqRs_MType` container  | Inquiry / XElement config | `DomainConfigs`            |
-| `*AcctModRq_MType` containers    | Modification config       | `ModificationDomainConfigs`|
-| Single `*ModRq_MType` container  | Modification config       | `ModificationDomainConfigs`|
-| Only Add/Ext/Ren/Pmt types       | No config needed          | n/a                        |
-| Mix of Rq and Rs with x_         | Both config types         | Both classes               |
-
----
-
-                    | Single flat container          |
-| `WireInqRs_MType`                            | `^(?<key>Wire)InqRs_MType# JXSchemaGenerator
-
-A .NET CLI tool that parses JXChange XSD schema files and generates JSON element mapping files.
-These files are consumed by API client utilities (InquiryElements.js, etc.) to resolve which
-extended elements (x_ prefixed) and their tags should be included in JXChange API requests.
-
----
-
-## Requirements
-
-- .NET 10 SDK
-- JXChange XSD schema files in a local folder
-
----
-
-## Usage
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input <SchemaFolder> [--root <RootXsdFile>] [--out <OutputFolder>] [--strict true|false]
-```
-
-**Arguments**
-
-| Argument  | Required | Default     | Description                                              |
-|-----------|----------|-------------|----------------------------------------------------------|
-| --input   | yes      |             | Folder containing all XSD files                          |
-| --root    | no       |             | Single XSD file to process. Omit to process all masters  |
-| --out     | no       | .\artifacts | Output folder for generated JSON                         |
-| --strict  | no       | true        | Fail on schema compile errors                            |
-
-**Process all master XSDs automatically**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --out .\artifacts
-```
-
-**Process a single XSD**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_InquiryMaster.xsd --out .\artifacts
-```
-
----
-
-## Output
-
-All output files share the same top-level structure and use `entityTypes` as the
-uniform collection key regardless of domain.
-
-| Root XSD                  | Output File(s)                                              |
-|---------------------------|-------------------------------------------------------------|
-| TPG_InquiryMaster.xsd     | inquiryElements.json                                        |
-| TPG_CustomerMaster.xsd    | customerElements.json, customerModificationElements.json    |
-| TPG_DepositMaster.xsd     | depositModificationElements.json                            |
-| TPG_LoanMaster.xsd        | loanModificationElements.json                               |
-
-```json
-{
-  "version": "1.0.0",
-  "lastUpdated": "2026-02-21",
-  "entityTypes": {
-    "D": {
-      "name": "Deposit/Checking/Savings",
-      "aliases": ["S", "X"],
-      "extendedElements": [
-        {
-          "name": "x_DepInfoRec",
-          "description": null,
-          "tags": ["AcctId", "AcctStat", "BrCode", "..."]
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Supported Domains
-
-### Inquiry (TPG_InquiryMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| L   | Loan                     | O       |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Customer (TPG_CustomerMaster.xsd)
-
-| Key  | Name     | Aliases |
-|------|----------|---------|
-| Cust | Customer |         |
-
-### Deposit Modification (TPG_DepositMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Loan Modification (TPG_LoanMaster.xsd)
-
-| Key | Name | Aliases |
-|-----|------|---------|
-| L   | Loan | O       |
-
----
-
-## Adding a New Domain
-
-### Step 1 - Identify the XSD pattern
-
-Run these three commands against the target XSD. The output determines which
-config type to use and what values to supply.
-
-**Command 1 - Find which complex types own x_ elements**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern '"x_[A-Za-z]' |
-    ForEach-Object {
-        $lines = Get-Content $_.Path
-        $lines[0..($_.LineNumber-2)] | Select-String 'complexType name=' | Select-Object -Last 1
-    } | Sort-Object -Unique
-```
-
-Look at the type names returned. They tell you the container shape.
-
-**Command 2 - Find all top-level response and request container types**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern 'complexType name="[A-Za-z]+(Rq|Rs)_MType"' |
-    Select-Object -First 20
-```
-
-Use this to confirm whether the file is inquiry-side (Rs), modification-side (Rq), or both.
-
-**Command 3 - Inspect a specific container type in full**
-
-```powershell
-$typeName = "DepAcctModRq_MType"
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern "complexType name=""$typeName""" |
-    ForEach-Object { Get-Content $_.Path | Select-Object -Skip ($_.LineNumber - 1) -First 50 }
-```
-
-Replace the type name with one found in Commands 1 or 2.
-
----
-
-### Step 2 - Determine the config type
-
-Use the table below to classify the XSD based on what Commands 1 and 2 returned.
-
-| What you see in the output       | Config type to use        | Class to add entry to      |
-|----------------------------------|---------------------------|----------------------------|
-| `*AcctInqRec_CType` containers   | Inquiry / XElement config | `DomainConfigs`            |
-| Single `*InqRs_MType` container  | Inquiry / XElement config | `DomainConfigs`            |
-| `*AcctModRq_MType` containers    | Modification config       | `ModificationDomainConfigs`|
-| Single `*ModRq_MType` container  | Modification config       | `ModificationDomainConfigs`|
-| Only Add/Ext/Ren/Pmt types       | No config needed          | n/a                        |
-| Mix of Rq and Rs with x_         | Both config types         | Both classes               |
-
----
-
-                    | Single flat container          |
-| `DepAcctModRq_MType`, `LnAcctModRq_MType`    | `^(?<key>[A-Za-z]+)AcctModRq_MType# JXSchemaGenerator
-
-A .NET CLI tool that parses JXChange XSD schema files and generates JSON element mapping files.
-These files are consumed by API client utilities (InquiryElements.js, etc.) to resolve which
-extended elements (x_ prefixed) and their tags should be included in JXChange API requests.
-
----
-
-## Requirements
-
-- .NET 10 SDK
-- JXChange XSD schema files in a local folder
-
----
-
-## Usage
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input <SchemaFolder> [--root <RootXsdFile>] [--out <OutputFolder>] [--strict true|false]
-```
-
-**Arguments**
-
-| Argument  | Required | Default     | Description                                              |
-|-----------|----------|-------------|----------------------------------------------------------|
-| --input   | yes      |             | Folder containing all XSD files                          |
-| --root    | no       |             | Single XSD file to process. Omit to process all masters  |
-| --out     | no       | .\artifacts | Output folder for generated JSON                         |
-| --strict  | no       | true        | Fail on schema compile errors                            |
-
-**Process all master XSDs automatically**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --out .\artifacts
-```
-
-**Process a single XSD**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_InquiryMaster.xsd --out .\artifacts
-```
-
----
-
-## Output
-
-All output files share the same top-level structure and use `entityTypes` as the
-uniform collection key regardless of domain.
-
-| Root XSD                  | Output File(s)                                              |
-|---------------------------|-------------------------------------------------------------|
-| TPG_InquiryMaster.xsd     | inquiryElements.json                                        |
-| TPG_CustomerMaster.xsd    | customerElements.json, customerModificationElements.json    |
-| TPG_DepositMaster.xsd     | depositModificationElements.json                            |
-| TPG_LoanMaster.xsd        | loanModificationElements.json                               |
-
-```json
-{
-  "version": "1.0.0",
-  "lastUpdated": "2026-02-21",
-  "entityTypes": {
-    "D": {
-      "name": "Deposit/Checking/Savings",
-      "aliases": ["S", "X"],
-      "extendedElements": [
-        {
-          "name": "x_DepInfoRec",
-          "description": null,
-          "tags": ["AcctId", "AcctStat", "BrCode", "..."]
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Supported Domains
-
-### Inquiry (TPG_InquiryMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| L   | Loan                     | O       |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Customer (TPG_CustomerMaster.xsd)
-
-| Key  | Name     | Aliases |
-|------|----------|---------|
-| Cust | Customer |         |
-
-### Deposit Modification (TPG_DepositMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Loan Modification (TPG_LoanMaster.xsd)
-
-| Key | Name | Aliases |
-|-----|------|---------|
-| L   | Loan | O       |
-
----
-
-## Adding a New Domain
-
-### Step 1 - Identify the XSD pattern
-
-Run these three commands against the target XSD. The output determines which
-config type to use and what values to supply.
-
-**Command 1 - Find which complex types own x_ elements**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern '"x_[A-Za-z]' |
-    ForEach-Object {
-        $lines = Get-Content $_.Path
-        $lines[0..($_.LineNumber-2)] | Select-String 'complexType name=' | Select-Object -Last 1
-    } | Sort-Object -Unique
-```
-
-Look at the type names returned. They tell you the container shape.
-
-**Command 2 - Find all top-level response and request container types**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern 'complexType name="[A-Za-z]+(Rq|Rs)_MType"' |
-    Select-Object -First 20
-```
-
-Use this to confirm whether the file is inquiry-side (Rs), modification-side (Rq), or both.
-
-**Command 3 - Inspect a specific container type in full**
-
-```powershell
-$typeName = "DepAcctModRq_MType"
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern "complexType name=""$typeName""" |
-    ForEach-Object { Get-Content $_.Path | Select-Object -Skip ($_.LineNumber - 1) -First 50 }
-```
-
-Replace the type name with one found in Commands 1 or 2.
-
----
-
-### Step 2 - Determine the config type
-
-Use the table below to classify the XSD based on what Commands 1 and 2 returned.
-
-| What you see in the output       | Config type to use        | Class to add entry to      |
-|----------------------------------|---------------------------|----------------------------|
-| `*AcctInqRec_CType` containers   | Inquiry / XElement config | `DomainConfigs`            |
-| Single `*InqRs_MType` container  | Inquiry / XElement config | `DomainConfigs`            |
-| `*AcctModRq_MType` containers    | Modification config       | `ModificationDomainConfigs`|
-| Single `*ModRq_MType` container  | Modification config       | `ModificationDomainConfigs`|
-| Only Add/Ext/Ren/Pmt types       | No config needed          | n/a                        |
-| Mix of Rq and Rs with x_         | Both config types         | Both classes               |
-
----
-
-           | Multiple prefixes, one regex   |
-| `CustModRq_MType`                            | `^(?<key>Cust)ModRq_MType# JXSchemaGenerator
-
-A .NET CLI tool that parses JXChange XSD schema files and generates JSON element mapping files.
-These files are consumed by API client utilities (InquiryElements.js, etc.) to resolve which
-extended elements (x_ prefixed) and their tags should be included in JXChange API requests.
-
----
-
-## Requirements
-
-- .NET 10 SDK
-- JXChange XSD schema files in a local folder
-
----
-
-## Usage
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input <SchemaFolder> [--root <RootXsdFile>] [--out <OutputFolder>] [--strict true|false]
-```
-
-**Arguments**
-
-| Argument  | Required | Default     | Description                                              |
-|-----------|----------|-------------|----------------------------------------------------------|
-| --input   | yes      |             | Folder containing all XSD files                          |
-| --root    | no       |             | Single XSD file to process. Omit to process all masters  |
-| --out     | no       | .\artifacts | Output folder for generated JSON                         |
-| --strict  | no       | true        | Fail on schema compile errors                            |
-
-**Process all master XSDs automatically**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --out .\artifacts
-```
-
-**Process a single XSD**
-
-```
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_InquiryMaster.xsd --out .\artifacts
-```
-
----
-
-## Output
-
-All output files share the same top-level structure and use `entityTypes` as the
-uniform collection key regardless of domain.
-
-| Root XSD                  | Output File(s)                                              |
-|---------------------------|-------------------------------------------------------------|
-| TPG_InquiryMaster.xsd     | inquiryElements.json                                        |
-| TPG_CustomerMaster.xsd    | customerElements.json, customerModificationElements.json    |
-| TPG_DepositMaster.xsd     | depositModificationElements.json                            |
-| TPG_LoanMaster.xsd        | loanModificationElements.json                               |
-
-```json
-{
-  "version": "1.0.0",
-  "lastUpdated": "2026-02-21",
-  "entityTypes": {
-    "D": {
-      "name": "Deposit/Checking/Savings",
-      "aliases": ["S", "X"],
-      "extendedElements": [
-        {
-          "name": "x_DepInfoRec",
-          "description": null,
-          "tags": ["AcctId", "AcctStat", "BrCode", "..."]
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Supported Domains
-
-### Inquiry (TPG_InquiryMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| L   | Loan                     | O       |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Customer (TPG_CustomerMaster.xsd)
-
-| Key  | Name     | Aliases |
-|------|----------|---------|
-| Cust | Customer |         |
-
-### Deposit Modification (TPG_DepositMaster.xsd)
-
-| Key | Name                     | Aliases |
-|-----|--------------------------|---------|
-| D   | Deposit/Checking/Savings | S, X    |
-| T   | Time Deposit/CD          |         |
-| B   | Safe Deposit Box         |         |
-| C   | Collection/Trust         |         |
-
-### Loan Modification (TPG_LoanMaster.xsd)
-
-| Key | Name | Aliases |
-|-----|------|---------|
-| L   | Loan | O       |
-
----
-
-## Adding a New Domain
-
-### Step 1 - Identify the XSD pattern
-
-Run these three commands against the target XSD. The output determines which
-config type to use and what values to supply.
-
-**Command 1 - Find which complex types own x_ elements**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern '"x_[A-Za-z]' |
-    ForEach-Object {
-        $lines = Get-Content $_.Path
-        $lines[0..($_.LineNumber-2)] | Select-String 'complexType name=' | Select-Object -Last 1
-    } | Sort-Object -Unique
-```
-
-Look at the type names returned. They tell you the container shape.
-
-**Command 2 - Find all top-level response and request container types**
-
-```powershell
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern 'complexType name="[A-Za-z]+(Rq|Rs)_MType"' |
-    Select-Object -First 20
-```
-
-Use this to confirm whether the file is inquiry-side (Rs), modification-side (Rq), or both.
-
-**Command 3 - Inspect a specific container type in full**
-
-```powershell
-$typeName = "DepAcctModRq_MType"
-Select-String -Path .\schemas\TPG_TargetMaster.xsd -Pattern "complexType name=""$typeName""" |
-    ForEach-Object { Get-Content $_.Path | Select-Object -Skip ($_.LineNumber - 1) -First 50 }
-```
-
-Replace the type name with one found in Commands 1 or 2.
-
----
-
-### Step 2 - Determine the config type
-
-Use the table below to classify the XSD based on what Commands 1 and 2 returned.
-
-| What you see in the output       | Config type to use        | Class to add entry to      |
-|----------------------------------|---------------------------|----------------------------|
-| `*AcctInqRec_CType` containers   | Inquiry / XElement config | `DomainConfigs`            |
-| Single `*InqRs_MType` container  | Inquiry / XElement config | `DomainConfigs`            |
-| `*AcctModRq_MType` containers    | Modification config       | `ModificationDomainConfigs`|
-| Single `*ModRq_MType` container  | Modification config       | `ModificationDomainConfigs`|
-| Only Add/Ext/Ren/Pmt types       | No config needed          | n/a                        |
-| Mix of Rq and Rs with x_         | Both config types         | Both classes               |
-
----
-
-                    | Single flat container          |
-
-The named capture group must be called "key". It is passed to the TypeToEntry
-switch expression to produce the output entity key, display name, and aliases.
-
----
-
-### Step 4 - Build the config entry
-
-**Inquiry / XElement config (DomainConfig.cs)**
+Both inquiry and search generators are **fully auto-discovering**. The only config needed is
+the output file name, registered in two static classes:
 
 ```csharp
-public static readonly DomainConfig Wire = new()
+// InquiryConfigs — maps XSD file name -> inquiry output file name
+// SearchConfigs  — maps XSD file name -> search output file name
+public static class InquiryConfigs
 {
-    OutputFileName     = "wireElements.json",
-    CollectionKeyName  = "entityTypes",           // always entityTypes
-    ContainerTypeRegex = new Regex(@"^(?<key>Wire)InqRs_MType$", RegexOptions.Compiled),
-    OutputOrder        = ["Wire"],
-    TypeToEntry        = key => key switch
+    public static OperationConfig? FromRootXsd(string rootXsd) =>
+        Path.GetFileName(rootXsd).ToLowerInvariant() switch
+        {
+            "tpg_depositmaster.xsd" => new() { OutputFileName = "depositInquiryElements.json" },
+            // ...
+            _ => null,
+        };
+}
+```
+
+### `ModificationDomainConfig.cs` — Modification
+
+Modification configs require three extra properties because entity type keys and grouping
+cannot be derived from the XSD alone:
+
+| Property            | Purpose                                                                                 |
+|---------------------|-----------------------------------------------------------------------------------------|
+| `OutputFileName`    | Output JSON file name                                                                   |
+| `ContainerTypeRegex`| Regex applied to each complex type name; must capture named group `key`                 |
+| `TypeToEntry`       | Maps the `key` capture to a display name, output key, and aliases                       |
+| `OutputOrder`       | Controls the key order in the emitted JSON                                              |
+
+```csharp
+public static readonly ModificationDomainConfig Deposit = new()
+{
+    OutputFileName     = "depositModificationElements.json",
+    ContainerTypeRegex = new Regex(
+        @"^(?<key>[A-Za-z]+)AcctModRq_MType$|^(?<key>AcctSweep|TaxPln|...)ModRq_MType$",
+        RegexOptions.Compiled),
+    OutputOrder = ["D", "T", "B", "C", "AcctSweep", "TaxPln", "..."],
+    TypeToEntry = key => key switch
     {
-        "Wire" => new("Wire", "Wire Transfer", []),
-        _      => null,                           // null = skip this container
+        "Dep"      => new("D", "Deposit/Checking/Savings", ["S", "X"]),
+        "TimeDep"  => new("T", "Time Deposit/CD",          []),
+        "SafeDep"  => new("B", "Safe Deposit Box",         []),
+        "Trck"     => new("C", "Collection/Trust",         []),
+        "AcctSweep"=> new("AcctSweep", "Account Sweep",    []),
+        _          => null,  // unknown key = skip silently
     },
 };
 ```
 
-**Modification config (ModificationDomainConfig.cs)**
+---
 
-```csharp
-public static readonly ModificationDomainConfig Wire = new()
-{
-    OutputFileName     = "wireModificationElements.json",
-    ContainerTypeRegex = new Regex(@"^(?<key>Wire)ModRq_MType$", RegexOptions.Compiled),
-    OutputOrder        = ["Wire"],
-    TypeToEntry        = key => key switch
-    {
-        "Wire" => new("Wire", "Wire Transfer", []),
-        _      => null,
-    },
-};
+## Adding a New XSD
+
+### Step 1 — Run `detect`
+
+```
+dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input .\schemas --root tpg_newmaster.xsd
 ```
 
-**Multi-entity example (multiple prefixes, one regex)**
+The report shows:
+
+- How many `*InqRs_MType` response types with `x_*` elements were found (inquiry)
+- Whether those types are already registered in `InquiryConfigs`
+- How many `*ModRq_MType` request types with modification sections were found
+- Whether those types are already registered in `ModificationDomainConfigs`
+- Exact tag counts per section from the real expansion pipeline
+- A copy-paste config snippet for modification (if needed)
+
+### Step 2 — Register inquiry and/or search (if the XSD has them)
+
+Add an entry to `InquiryConfigs.FromRootXsd` and/or `SrchOpConfigs.FromRootXsd` in
+`OperationConfig.cs`. Only the output file name is needed — operations are auto-discovered.
 
 ```csharp
-TypeToEntry = key => key switch
-{
-    "Dep"     => new("D", "Deposit/Checking/Savings", ["S", "X"]),
-    "TimeDep" => new("T", "Time Deposit/CD",          []),
-    "Ln"      => new("L", "Loan",                     ["O"]),
-    _         => null,   // unknown prefix = skip silently
-},
+"tpg_newmaster.xsd" => new() { OutputFileName = "newInquiryElements.json" },
 ```
+
+### Step 3 — Add a modification config (if the XSD has `*ModRq_MType` types)
+
+Use the config snippet printed by `detect` as a starting point. Add the static config entry
+to `ModificationDomainConfigs` in `ModificationDomainConfig.cs`, then register it in
+`ModificationDomainConfigs.FromRootXsd`.
+
+### Step 4 — Run and verify
+
+```
+dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --root tpg_newmaster.xsd --out .\artifacts
+```
+
+The summary at the end reports any sections that resolved zero tags. If any are listed,
+run the detect command again and inspect the specific type name — it usually indicates a
+namespace mismatch or a type that is intentionally empty in the XSD.
 
 ---
 
-### Step 5 - Register the config
+## How Schema Expansion Works
 
-Add a line to the appropriate FromRootXsd switch in DomainConfig.cs or
-ModificationDomainConfig.cs.
+For each element found in a container type, the tool attempts to resolve its complex type
+using three strategies in order:
 
-```csharp
-public static DomainConfig? FromRootXsd(string rootXsd) =>
-    Path.GetFileName(rootXsd).ToLowerInvariant() switch
-    {
-        "tpg_inquirymaster.xsd"  => Inquiry,
-        "tpg_customermaster.xsd" => Customer,
-        "tpg_wiremaster.xsd"     => Wire,      // add this line
-        _                        => null,
-    };
-```
+| Strategy | Description                                                                                                          |
+|----------|----------------------------------------------------------------------------------------------------------------------|
+| 1        | `ElementSchemaType` — the .NET XSD compiler resolved the type reference directly on the element after compilation.   |
+| 2        | `SchemaTypeName` with namespace backfill — local type references in JXChange XSDs often have an empty namespace after compilation. The enclosing type's namespace is filled in and the index lookup is retried. |
+| 3        | Naming convention — appends `_CType` then `_AType` to the element name and tries both. Example: `x_DepInfoRec` → `x_DepInfoRec_CType`. |
 
----
+Once a type resolves, it is expanded recursively into a hierarchical `SchemaNode` tree.
+Both container element names and their leaf children are included because the JXChange API
+expects the full path from the envelope element down to the scalar field.
 
-### Step 6 - Run and verify
-
-```txt
-dotnet run --project .\src\JXSchemaGenerator.Cli -- --input .\schemas --root TPG_WireMaster.xsd --out .\artifacts
-```
-
-The summary line at the end of the run reports how many sections resolved zero tags.
-If any are listed, run Command 3 from Step 1 against those specific type names to
-diagnose why the type lookup missed.
+The `isArray: true` marker is set on any node whose XSD type is wrapped in a `maxOccurs="unbounded"`
+sequence — this tells `ModificationBuilder` to treat those nodes as array containers.
 
 ---
 
 ## Project Structure
 
-```txt
+```
 JXSchemaGenerator.slnx
 src/
   JXSchemaGenerator.Cli/
-    Program.cs                              - CLI entry point, loops over all master XSDs
+    Program.cs                        CLI entry point; dispatches generate / detect commands
   JXSchemaGenerator.Core/
     Emit/
-      JsonEmitter.cs                        - JSON serialization helper
+      JsonEmitter.cs                  JSON serialization helper
     Expand/
-      ExpansionOptions.cs                   - Controls tag expansion depth and filtering
-      TypeExpander.cs                       - Recursively expands XSD complex types into tag lists
+      ExpansionOptions.cs             Controls tag expansion behaviour (leaf-only, skip-any, etc.)
+      TypeExpander.cs                 Recursively expands XSD complex types into schema trees
     Generate/
-      DomainConfig.cs                       - Inquiry/XElement domain configs  (add new here)
-      ModificationDomainConfig.cs           - Modification domain configs      (add new here)
-      XElementGenerator.cs                  - Generic inquiry element generator
-      ModificationGenerator.cs              - Generic modification element generator
+      OperationConfig.cs              InquiryConfigs + SrchOpConfigs registries (add new XSDs here)
+      ModificationDomainConfig.cs     Modification domain configs (add new here)
+      InquiryGenerator.cs             Auto-discovers *InqRq_MType, emits inquiryOperations
+      AddGenerator.cs                 Auto-discovers *AddRq_MType, emits addOperations
+      SearchGenerator.cs              Auto-discovers *SrchRq_MType, emits searchOperations
+      ModificationGenerator.cs        Regex-driven modification section expander
+      DomainDetector.cs               Analyses an XSD index and produces a DetectionReport
+      DetectionReportPrinter.cs       Renders a DetectionReport to the console
       Models/
-        InquiryModels.cs                    - Output model for inquiry/element files
-        ModificationModels.cs               - Output model for modification files
+        InquiryModels.cs              Output model for inquiry files
+        AddModels.cs                  Output model for add files
+        SearchModels.cs               Output model for search files
+        ModificationModel.cs          Output model for modification files
+        DetectionModels.cs            Internal models for the detect command
     Schema/
-      SchemaIndex.cs                        - In-memory index of compiled XSD types and elements
-      SchemaLoader.cs                       - Loads and compiles XSD files into XmlSchemaSet
-      LocalFolderXmlResolver.cs             - Resolves XSD imports from a local folder
+      SchemaIndex.cs                  In-memory index of all compiled XSD complex types
+      SchemaLoader.cs                 Loads and compiles XSD files into XmlSchemaSet
+      LocalFolderXmlResolver.cs       Resolves XSD xs:include / xs:import from a local folder
 tests/
   JXSchemaGenerator.Tests/
     UnitTest1.cs
 ```
-
----
-
-## How Tag Expansion Works
-
-For each element found in a container type, the tool attempts to resolve its full
-tag list using three strategies in order.
-
-| Strategy | Description                                                                                                                                                             |
-|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1        | ElementSchemaType -- the .NET XSD compiler resolved the type reference directly on the element object after compilation.                                                |
-| 2        | SchemaTypeName with namespace backfill -- local element type references in JXChange XSDs often have an empty namespace after compilation. The enclosing type's namespace is filled in and the index lookup is retried. |
-| 3        | Naming convention fallback -- strips any x_prefix and appends_CType or _AType to construct the expected type name. Example: x_DepInfoRec resolves to x_DepInfoRec_CType. |
-
-Once a type is resolved it is expanded recursively. All element names at every
-depth are included as tags, not just leaf nodes, because the JXChange API expects
-both container element names and their children in the request.

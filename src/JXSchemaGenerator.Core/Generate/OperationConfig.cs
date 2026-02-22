@@ -37,6 +37,32 @@ public static class InquiryConfigs
 }
 
 /// <summary>
+/// Registry mapping root XSD file names to add-operation output configs.
+/// AddGenerator discovers all *AddRq_MType types automatically.
+/// </summary>
+public static class AddOpConfigs
+{
+	public static OperationConfig? FromRootXsd(string rootXsd) =>
+		Path.GetFileName(rootXsd).ToLowerInvariant() switch
+		{
+			"tpg_achmaster.xsd"         => new() { OutputFileName = "achAddElements.json" },
+			"tpg_billpaymaster.xsd"     => new() { OutputFileName = "billPayAddElements.json" },
+			"tpg_crcardmaster.xsd"      => new() { OutputFileName = "crCardAddElements.json" },
+			"tpg_customermaster.xsd"    => new() { OutputFileName = "customerAddElements.json" },
+			"tpg_custommaster.xsd"      => new() { OutputFileName = "customAddElements.json" },
+			"tpg_depositmaster.xsd"     => new() { OutputFileName = "depositAddElements.json" },
+			"tpg_ensmaster.xsd"         => new() { OutputFileName = "ensAddElements.json" },
+			"tpg_imagemaster.xsd"       => new() { OutputFileName = "imageAddElements.json" },
+			"tpg_imsmaster.xsd"         => new() { OutputFileName = "imsAddElements.json" },
+			"tpg_loanmaster.xsd"        => new() { OutputFileName = "loanAddElements.json" },
+			"tpg_tellermaster.xsd"      => new() { OutputFileName = "tellerAddElements.json" },
+			"tpg_transactionmaster.xsd" => new() { OutputFileName = "transactionAddElements.json" },
+			"tpg_wiremaster.xsd"        => new() { OutputFileName = "wireAddElements.json" },
+			_ => null,
+		};
+}
+
+/// <summary>
 /// Registry mapping root XSD file names to search-operation output configs.
 /// SearchGenerator discovers all *SrchRq_MType types automatically.
 /// </summary>

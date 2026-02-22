@@ -153,6 +153,26 @@ foreach (var xsdFile in targets)
 		wroteAny = true;
 	}
 
+	var addConfig = AddOpConfigs.FromRootXsd(xsdFile);
+	if (addConfig is not null)
+	{
+		var addModel = new AddGenerator().Generate(index, options);
+
+		var addPayload = new Dictionary<string, object?>
+		{
+			["version"] = addModel.Version,
+			["lastUpdated"] = addModel.LastUpdated,
+			["addOperations"] = addModel.addOperations,
+		};
+
+		var addPath = Path.Combine(output, addConfig.OutputFileName);
+		JsonEmitter.WriteToFile(addPath, addPayload);
+		Console.WriteLine($"Wrote: {addPath}");
+
+		written++;
+		wroteAny = true;
+	}
+
 	var searchConfig = SrchOpConfigs.FromRootXsd(xsdFile);
 	if (searchConfig is not null)
 	{
