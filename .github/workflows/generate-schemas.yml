@@ -1,0 +1,125 @@
+name: Generate and Publish JXChange Schemas
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Schema source"
+        required: true
+        default: "local"
+        type: choice
+        options:
+          - local # use committed ./schemas/*.xsd files
+          - jackhenry # download latest TPG XSD zip from jkhy.github.io (no auth needed)
+      version:
+        description: "Specific TPG release version to fetch, e.g. 2026.0.00 (jackhenry source only, blank = latest)"
+        required: false
+        type: string
+      tag:
+        description: "Release tag, e.g. v1.0.0 (blank = auto date+sha tag)"
+        required: false
+        type: string
+
+  push:
+    branches:
+      - main
+    paths:
+      - "schemas/**"
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  generate:
+    name: Generate Schemas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch TPG XSD files from JackHenry (jackhenry source)
+        if: ${{ github.event.inputs.source == 'jackhenry' }}
+        env:
+          JX_GH_READ_TOKEN: ${{ secrets.JX_GH_READ_TOKEN }}
+        run: |
+          echo "Fetching XSD files..."
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            node scripts/fetch-xsd.js --version ${{ github.event.inputs.version }}
+          else
+            node scripts/fetch-xsd.js
+          fi
+
+      - name: Use local XSD files (local source or push trigger)
+        if: ${{ github.event.inputs.source != 'jackhenry' }}
+        run: |
+          echo "Using committed XSD files from ./schemas/"
+          ls -la schemas/
+          echo "Total: $(ls schemas/*.xsd 2>/dev/null | wc -l) XSD file(s)"
+
+      - name: Generate JSON schemas from XSD files
+        run: npm run generate
+
+      - name: Verify output
+        run: |
+          echo "Generated schema files:"
+          find dist/schemas -name "*.json" | sort
+          echo ""
+          echo "Total files: $(find dist/schemas -name "*.json" | wc -l)"
+
+      - name: Zip schemas
+        run: |
+          cd dist
+          zip -r ../jxchange-schemas.zip schemas/
+          cd ..
+          echo "Archive: $(du -sh jxchange-schemas.zip | cut -f1)"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: JXChange Schemas ${{ steps.tag.outputs.tag }}
+          body: |
+            Auto-generated JXChange JSON schemas from XSD definitions.
+
+            **Source**: ${{ github.event.inputs.source || 'local (push trigger)' }}
+            **TPG version**: ${{ github.event.inputs.version || 'latest' }}
+            **Commit**: ${{ github.sha }}
+
+            ## Usage in @ffb/jxchange
+
+            ```bash
+            npm run download-schemas
+            ```
+
+            Or download `jxchange-schemas.zip` from this release manually and
+            extract it to `./src/soap/utils/schemas/`.
+          files: jxchange-schemas.zip
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact (backup)
+        uses: actions/upload-artifact@v6
+        with:
+          name: jxchange-schemas-${{ steps.tag.outputs.tag }}
+          path: jxchange-schemas.zip
+          retention-days: 30

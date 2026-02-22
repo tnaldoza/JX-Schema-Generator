@@ -1,0 +1,21 @@
+{
+  "name": "jx-schema-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fetches Jack Henry jXchange TPG XSDs and generates JSON schemas.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "fetch:xsd": "node scripts/fetch-xsd.js",
+    "fetch:xsd:all": "node scripts/fetch-xsd.js --all",
+    "fetch:xsd:version": "node scripts/fetch-xsd.js --version",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive:true, force:true })\"",
+    "generate": "dotnet run --project src/JXSchemaGenerator.Cli -- generate --input schemas --out dist/schemas",
+    "detect": "dotnet run --project src/JXSchemaGenerator.Cli -- detect --input schemas",
+    "build": "npm run generate"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

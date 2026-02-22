@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JXSchemaGenerator.Cli/JXSchemaGenerator.Cli.csproj" />
+    <Project Path="src/JXSchemaGenerator.Core/JXSchemaGenerator.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JXSchemaGenerator.Tests/JXSchemaGenerator.Tests.csproj" />
+  </Folder>
+</Solution>

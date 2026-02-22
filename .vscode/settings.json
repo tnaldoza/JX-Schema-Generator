@@ -1,0 +1,58 @@
+{
+  // Format on save
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+
+  // C# / OmniSharp / Roslyn
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+
+  // JSON
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.formatOnSave": true
+  },
+
+  // XML / project files
+  "[xml]": {
+    "editor.formatOnSave": true
+  },
+
+  // YAML
+  "[yaml]": {
+    "editor.formatOnSave": true
+  },
+
+  // Trim trailing whitespace and final newline (mirrors .editorconfig)
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // Use .editorconfig for indent/spacing preferences
+  "editor.detectIndentation": false,
+
+  // Show whitespace so you can see tabs vs spaces
+  "editor.renderWhitespace": "boundary",
+
+  // Roslyn / C# analyzer settings
+  "dotnet.enableEditorConfigSupport": true,
+  "csharp.format.enable": true,
+
+  // File associations
+  "files.associations": {
+    "*.csproj": "xml",
+    "*.props": "xml",
+    "*.targets": "xml",
+    "*.slnx": "xml",
+    "*.nuspec": "xml"
+  },
+
+  // Ruler at max line length from .editorconfig
+  "editor.rulers": [160]
+}
