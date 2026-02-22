@@ -59,6 +59,11 @@ jobs:
             node scripts/fetch-xsd.js
           fi
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.103"
+
       - name: Use local XSD files (local source or push trigger)
         if: ${{ github.event.inputs.source != 'jackhenry' }}
         run: |
