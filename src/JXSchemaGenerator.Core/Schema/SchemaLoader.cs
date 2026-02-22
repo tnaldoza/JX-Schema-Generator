@@ -10,6 +10,19 @@ public sealed class SchemaLoader
 {
 	public sealed record LoadResult(XmlSchemaSet SchemaSet, string RootFile);
 
+	/// <summary>
+	/// Namespace prefixes whose unresolved declarations should be treated as
+	/// non-fatal warnings rather than hard errors.  These are SOAP infrastructure
+	/// namespaces (WS-Security, WS-Utility) that JXChange XSDs import but whose
+	/// declarations have no bearing on the JXChange domain content we generate.
+	/// </summary>
+	private static readonly string[] KnownInfraNamespacePrefixes =
+	[
+		"http://docs.oasis-open.org/wss/",
+		"http://schemas.xmlsoap.org/",
+		"http://www.w3.org/2005/08/addressing",
+	];
+
 	public LoadResult LoadAndCompileRoot(string folderPath, string rootXsdFileName, bool strict)
 	{
 		var folder = Path.GetFullPath(folderPath);
@@ -19,27 +32,33 @@ public sealed class SchemaLoader
 			throw new FileNotFoundException($"Root XSD not found: {rootPath}");
 
 		var errors = new List<string>();
-		var warnings = new List<string>(); // optional: keep for debug if you want
+		var warnings = new List<string>();
 
 		ValidationEventHandler handler = (_, e) =>
 		{
 			var msg = $"{e.Severity}: {e.Message}";
 
-			// Many Jack Henry schemas emit resolver-related warnings that cascade if treated as fatal.
 			if (e.Severity == XmlSeverityType.Error)
 			{
-				if (errors.Count < 200) errors.Add(msg);
-				else if (errors.Count == 200) errors.Add("... (truncated after 200 errors)");
+				// Demote errors that are purely about unresolvable SOAP/WS-Security
+				// infrastructure schemas.  These never affect JXChange domain content.
+				if (IsInfrastructureError(e.Message))
+				{
+					if (warnings.Count < 50) warnings.Add($"[infra-demoted] {msg}");
+				}
+				else
+				{
+					if (errors.Count < 200) errors.Add(msg);
+					else if (errors.Count == 200) errors.Add("... (truncated after 200 errors)");
+				}
 			}
 			else
 			{
-				// Keep warnings for visibility; do NOT fail because of them.
 				if (warnings.Count < 50) warnings.Add(msg);
 				else if (warnings.Count == 50) warnings.Add("... (more warnings truncated)");
 			}
 		};
 
-		// reuse a single resolver instance
 		var resolver = new LocalFolderXmlResolver(folder);
 
 		var set = new XmlSchemaSet
@@ -83,5 +102,18 @@ public sealed class SchemaLoader
 		}
 
 		return new LoadResult(set, rootXsdFileName);
+	}
+
+	/// <summary>
+	/// Returns true when a validation error message is about an infrastructure
+	/// namespace (WS-Security, SOAP addressing) that cannot be resolved locally
+	/// and is irrelevant to JXChange domain-content generation.
+	/// </summary>
+	private static bool IsInfrastructureError(string message)
+	{
+		foreach (var prefix in KnownInfraNamespacePrefixes)
+			if (message.Contains(prefix, StringComparison.OrdinalIgnoreCase))
+				return true;
+		return false;
 	}
 }

@@ -6,14 +6,19 @@
  *   TPG_R<VER>_XSD/
  *     R<VER>TPGPub/
  *       Validation/
- *         TPG_CustomerMaster.xsd   <- only these *Master.xsd files are needed
- *         TPG_DepositMaster.xsd
+ *         TPG_CustomerMaster.xsd   <- extracted (*Master.xsd)
+ *         TPG_DepositMaster.xsd    <- extracted (*Master.xsd)
+ *         oasis-*.xsd              <- extracted (dependency schemas)
+ *         w3-*.xsd                 <- extracted (dependency schemas)
+ *         w3-*.dtd                 <- extracted (dependency schemas)
  *         TPG_Customer.wsdl        <- ignored
- *         oasis-*.xsd              <- ignored
- *         w3-*.xsd / w3-*.dtd     <- ignored
  *         ...
  *
- * Only `*Master.xsd` files are extracted; everything else is discarded.
+ * Extracted files:
+ *   - `*Master.xsd`  : JXChange domain schemas
+ *   - `oasis-*.xsd`  : OASIS WS-Security schemas (required by XmlSchemaSet compiler)
+ *   - `w3-*.xsd`     : W3C XML/XMLDSig/XMLEnc schemas (required by XmlSchemaSet compiler)
+ *   - `w3-*.dtd`     : W3C DTD files (required by XmlSchemaSet compiler)
  *
  * Usage:
  *   node scripts/fetch-xsd.js                   # latest only (default)
@@ -46,8 +51,18 @@ const FALLBACK_ZIPS = [
   "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2025.1.04_XSD.zip",
 ];
 
-// Only extract files matching this pattern; everything else is ignored
+// JXChange domain schemas
 const MASTER_XSD_RE = /TPG_\w+Master\.xsd$/i;
+
+// OASIS WS-Security and W3C dependency schemas required by the XmlSchemaSet compiler.
+// These are bundled in the zip alongside the Master XSDs and must be present in the
+// same output folder so LocalFolderXmlResolver can find them by filename.
+const DEPS_RE = /^(?:oasis-[^/\\]+\.xsd|w3-[^/\\]+\.xsd|w3-[^/\\]+\.dtd)$/i;
+
+/** Returns true for any file that should land in the output directory. */
+function isExtractTarget(basename) {
+  return MASTER_XSD_RE.test(basename) || DEPS_RE.test(basename);
+}
 
 function fetchText(url) {
   return new Promise((resolve, reject) => {
@@ -306,48 +321,54 @@ function* iterZipEntries(buf) {
   }
 }
 
-function extractMasterXsds(zipPath, outDir) {
+/** Node-native fallback: extract all target files from the zip buffer. */
+function extractTargetFiles(zipPath, outDir) {
   const buf = fs.readFileSync(zipPath);
-  const extracted = [];
-  let skipped = 0;
+  const masterFiles = [];
+  const depFiles = [];
 
   for (const { filename, data } of iterZipEntries(buf)) {
     const basename = path.basename(filename);
     if (MASTER_XSD_RE.test(basename)) {
       fs.writeFileSync(path.join(outDir, basename), data);
-      extracted.push(basename);
-    } else {
-      skipped++;
+      masterFiles.push(basename);
+    } else if (DEPS_RE.test(basename)) {
+      fs.writeFileSync(path.join(outDir, basename), data);
+      depFiles.push(basename);
     }
   }
 
-  return { extracted, skipped };
+  return { masterFiles, depFiles };
 }
 
 /**
  * Extraction strategy:
- * 1. Try system `unzip` piped through a filter - fast and handles large zips
+ * 1. Try system `unzip` with multiple patterns - fast and handles large zips
  * 2. Fall back to pure-Node entry-by-entry read (iterZipEntries)
  */
 function extractFromZip(zipPath, outDir) {
-  // Try system unzip - extract only *Master.xsd from anywhere in the zip
   try {
-    const result = execSync(
-      `unzip -o "${zipPath}" "*Master.xsd" -d "${outDir}"`,
+    // Extract Master XSDs and all dependency schemas in one pass
+    execSync(
+      `unzip -o "${zipPath}" "*Master.xsd" "oasis-*.xsd" "w3-*.xsd" "w3-*.dtd" -d "${outDir}"`,
       { stdio: "pipe" },
     );
-    // unzip preserves the nested folder structure; flatten it into outDir
-    flattenMasterXsds(outDir);
-    return countXsds(outDir);
+    // unzip preserves the nested folder structure; flatten everything into outDir
+    flattenTargetFiles(outDir);
+    return countExtracted(outDir);
   } catch {
     // system unzip not available or pattern match failed - use Node fallback
   }
 
-  return extractMasterXsds(zipPath, outDir).extracted;
+  const { masterFiles, depFiles } = extractTargetFiles(zipPath, outDir);
+  return { masterFiles, depFiles };
 }
 
-/** Move any *Master.xsd files found in sub-directories up to outDir and remove empty dirs. */
-function flattenMasterXsds(dir) {
+/**
+ * Move any target files found in sub-directories up to outDir and remove empty dirs.
+ * Deletes any non-target files that unzip placed in sub-directories.
+ */
+function flattenTargetFiles(dir) {
   const walk = (d) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, entry.name);
@@ -358,18 +379,25 @@ function flattenMasterXsds(dir) {
         } catch {
           /* not empty, leave it */
         }
-      } else if (MASTER_XSD_RE.test(entry.name) && d !== dir) {
+      } else if (isExtractTarget(entry.name) && d !== dir) {
         fs.renameSync(full, path.join(dir, entry.name));
-      } else if (!MASTER_XSD_RE.test(entry.name) && d !== dir) {
-        fs.unlinkSync(full); // delete non-Master files from sub-dirs
+      } else if (!isExtractTarget(entry.name) && d !== dir) {
+        fs.unlinkSync(full); // delete non-target files from sub-dirs
       }
     }
   };
   walk(dir);
 }
 
-function countXsds(dir) {
-  return fs.readdirSync(dir).filter((f) => MASTER_XSD_RE.test(f));
+/** Returns { masterFiles, depFiles } arrays of filenames present in dir. */
+function countExtracted(dir) {
+  const masterFiles = [];
+  const depFiles = [];
+  for (const f of fs.readdirSync(dir)) {
+    if (MASTER_XSD_RE.test(f)) masterFiles.push(f);
+    else if (DEPS_RE.test(f)) depFiles.push(f);
+  }
+  return { masterFiles, depFiles };
 }
 
 async function main() {
@@ -412,7 +440,7 @@ async function main() {
 
     const tmpZip = path.join(tmpDir, filename);
     await downloadFile(url, tmpZip);
-    console.log(`	${(fs.statSync(tmpZip).size / 1024).toFixed(0)} KB`);
+    console.log(`\t${(fs.statSync(tmpZip).size / 1024).toFixed(0)} KB`);
 
     // Multi-version mode: extract into versioned sub-folders
     const extractDir = multiVersion
@@ -420,22 +448,27 @@ async function main() {
       : OUTPUT_DIR;
     fs.mkdirSync(extractDir, { recursive: true });
 
-    console.log(`  Extracting *Master.xsd files -> ${extractDir}`);
-    const extracted = extractFromZip(tmpZip, extractDir);
+    console.log(`  Extracting XSD files -> ${extractDir}`);
+    const { masterFiles, depFiles } = extractFromZip(tmpZip, extractDir);
     fs.unlinkSync(tmpZip);
 
-    if (extracted.length === 0) {
+    if (masterFiles.length === 0) {
       throw new Error(`No *Master.xsd files found in ${filename}`);
     }
 
-    console.log(`	${extracted.length} Master XSD file(s):`);
-    extracted.sort().forEach((f) => console.log(`		${f}`));
+    console.log(`\t${masterFiles.length} Master XSD file(s):`);
+    masterFiles.sort().forEach((f) => console.log(`\t\t${f}`));
+
+    if (depFiles.length > 0) {
+      console.log(`\t${depFiles.length} dependency file(s):`);
+      depFiles.sort().forEach((f) => console.log(`\t\t${f}`));
+    }
   }
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 
   console.log("");
-  console.log(`	Done. XSD files are in: ${OUTPUT_DIR}`);
+  console.log(`\tDone. XSD files are in: ${OUTPUT_DIR}`);
 }
 
 main().catch((err) => {
