@@ -20,7 +20,7 @@ build modification request bodies.
 
 Processes master XSD files and writes JSON element mapping files to the output folder.
 
-```
+```txt
 dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input <SchemaFolder> [--root <XsdFile>] [--out <OutputFolder>] [--strict true|false]
 ```
 
@@ -29,11 +29,11 @@ dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input <SchemaFold
 Analyses a master XSD and prints a config recommendation report with exact tag counts.
 Use this when adding a new XSD to determine what config entries are needed.
 
-```
+```txt
 dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input <SchemaFolder> [--root <XsdFile>] [--strict true|false]
 ```
 
-**Arguments**
+#### **Arguments**
 
 | Argument  | Required | Default       | Description                                             |
 |-----------|----------|---------------|---------------------------------------------------------|
@@ -42,9 +42,9 @@ dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input <SchemaFolder
 | `--out`   | no       | `.\artifacts` | Output folder for generated JSON (`generate` only)      |
 | `--strict`| no       | `true`        | Fail on schema compile errors                           |
 
-**Examples**
+#### **Examples**
 
-```
+```txt
 # Process all registered master XSDs
 dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --out .\artifacts
 
@@ -61,21 +61,21 @@ dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input .\schemas --r
 
 Every JXChange operation follows a strict naming convention based on the operation type:
 
-| Suffix       | Meaning                          | Example                    |
-|--------------|----------------------------------|----------------------------|
-| `*InqRq_MType` | Inquiry request envelope        | `AcctInqRq_MType`          |
-| `*InqRs_MType` | Inquiry response envelope       | `AcctInqRs_MType`          |
-| `*SrchRq_MType`| Search request envelope         | `XferSrchRq_MType`         |
-| `*SrchRs_MType`| Search response envelope        | `XferSrchRs_MType`         |
+| Suffix          | Meaning                         | Example                    |
+| ------------    | --------------------------------| -------------------------- |
+| `*InqRq_MType`  | Inquiry request envelope        | `AcctInqRq_MType`          |
+| `*InqRs_MType`  | Inquiry response envelope       | `AcctInqRs_MType`          |
+| `*SrchRq_MType` | Search request envelope         | `XferSrchRq_MType`         |
+| `*SrchRs_MType` | Search response envelope        | `XferSrchRs_MType`         |
 | `*SrchRec_CType`| Search result record            | `XferSrchRec_CType`        |
-| `*ModRq_MType` | Modification request envelope   | `AcctSweepModRq_MType`     |
-| `*ModRs_MType` | Modification response envelope  | `AcctSweepModRs_MType`     |
+| `*ModRq_MType`  | Modification request envelope   | `AcctSweepModRq_MType`     |
+| `*ModRs_MType`  | Modification response envelope  | `AcctSweepModRs_MType`     |
 
 ### Rq → Rs derivation
 
 The response type for any operation is derived by swapping the `Rq` suffix to `Rs`:
 
-```
+```txt
 AcctInqRq_MType   →  strip "Rq_MType"  →  "AcctInq"   →  append "Rs_MType"  →  AcctInqRs_MType
 XferSrchRq_MType  →  strip "Rq_MType"  →  "XferSrch"  →  append "Rs_MType"  →  XferSrchRs_MType
 ```
@@ -87,7 +87,7 @@ The element name (the key used in output JSON) is the stripped middle portion:
 
 Search response records follow a different pattern — they use `Rec_CType` not `Rs_MType`:
 
-```
+```txt
 XferSrchRq_MType  →  strip "Rq_MType"  →  "XferSrch"  →  append "Rec_CType"  →  XferSrchRec_CType
 ```
 
@@ -106,7 +106,7 @@ The generator handles three distinct operation families, each with its own gener
 - Expands the request type (minus `MsgRqHdr`) into `requestSchema`
 - Looks up the matching `*InqRs_MType` response type and expands it (minus `MsgRsHdr`) into `responseSchema`
 - Patches `IncXtendElemArray.IncXtendElemInfo.XtendElem` in the request schema with the valid `x_*`
-  element names collected from the response schema (see [Extended Elements](#extended-elements))
+  element names collected from the response schema (see [Extended Elements](#extended-elements-x_))
 - Output key: `inquiryOperations`
 
 ### Search (`*SrchRq_MType`)
@@ -161,7 +161,7 @@ a ready-made enumeration of what can be requested.
 
 For account inquiry (`AcctInq`), the response schema groups `x_*` elements by account type record:
 
-```
+```txt
 responseSchema
   DepAcctInqRec        ← deposit/checking/savings accounts
     x_DepInfoRec
@@ -177,7 +177,7 @@ responseSchema
 
 For non-account inquiry (`CustInq`), `x_*` elements appear directly in `responseSchema`:
 
-```
+```txt
 responseSchema
   x_BusDetail
   x_RegDetail
@@ -386,7 +386,7 @@ public static readonly ModificationDomainConfig Deposit = new()
 
 ### Step 1 — Run `detect`
 
-```
+```txt
 dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input .\schemas --root tpg_newmaster.xsd
 ```
 
@@ -416,7 +416,7 @@ to `ModificationDomainConfigs` in `ModificationDomainConfig.cs`, then register i
 
 ### Step 4 — Run and verify
 
-```
+```txt
 dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --root tpg_newmaster.xsd --out .\artifacts
 ```
 
@@ -431,11 +431,11 @@ namespace mismatch or a type that is intentionally empty in the XSD.
 For each element found in a container type, the tool attempts to resolve its complex type
 using three strategies in order:
 
-| Strategy | Description                                                                                                          |
-|----------|----------------------------------------------------------------------------------------------------------------------|
-| 1        | `ElementSchemaType` — the .NET XSD compiler resolved the type reference directly on the element after compilation.   |
-| 2        | `SchemaTypeName` with namespace backfill — local type references in JXChange XSDs often have an empty namespace after compilation. The enclosing type's namespace is filled in and the index lookup is retried. |
-| 3        | Naming convention — appends `_CType` then `_AType` to the element name and tries both. Example: `x_DepInfoRec` → `x_DepInfoRec_CType`. |
+| Strategy | Description |
+| ---------- | ------------- |
+| 1 | `ElementSchemaType` — the .NET XSD compiler resolved the type reference directly on the element after compilation. |
+| 2 | `SchemaTypeName` with namespace backfill — local type references in JXChange XSDs often have an empty namespace after compilation. The enclosing type's namespace is filled in and the index lookup is retried. |
+| 3 | Naming convention — appends `_CType` then `_AType` to the element name and tries both. Example: `x_DepInfoRec` → `x_DepInfoRec_CType`. |
 
 Once a type resolves, it is expanded recursively into a hierarchical `SchemaNode` tree.
 Both container element names and their leaf children are included because the JXChange API
@@ -448,7 +448,7 @@ sequence — this tells `ModificationBuilder` to treat those nodes as array cont
 
 ## Project Structure
 
-```
+```txt
 JXSchemaGenerator.slnx
 src/
   JXSchemaGenerator.Cli/
@@ -482,3 +482,14 @@ tests/
   JXSchemaGenerator.Tests/
     UnitTest1.cs
 ```
+
+---
+
+## TODO
+
+### Validate operations
+
+`*ValidateRq_MType` operations (31 total across all XSDs, e.g. `XferAddValidateRq_MType`) are not
+yet generated. Unlike Add operations, Validate requests wrap an Add request as a child element
+rather than containing raw fields directly. A `ValidateGenerator` would need to handle this
+nesting and produce a `validateOperations` output section.
