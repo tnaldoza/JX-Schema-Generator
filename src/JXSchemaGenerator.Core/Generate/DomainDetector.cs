@@ -38,10 +38,10 @@ public sealed class DomainDetector
 
 		var report = new DetectionReport(_xsdFileName);
 
-		// Collect all *InqRec_CType and *InqRs_MType that contain x_ elements
+		// Collect all *InqRs_MType response types that contain x_ extended elements
+		// (these correspond to the InquiryGenerator auto-discovered operations)
 		var inquiryContainers = FindContainersMatching(
-			name => name.EndsWith("AcctInqRec_CType", StringComparison.OrdinalIgnoreCase)
-				 || name.EndsWith("InqRs_MType", StringComparison.OrdinalIgnoreCase),
+			name => name.EndsWith("InqRs_MType", StringComparison.OrdinalIgnoreCase),
 			requiresXChildren: true);
 
 		// Collect all *ModRq_MType that contain a *Mod_CType child with sections
@@ -58,13 +58,6 @@ public sealed class DomainDetector
 			entry.XElements.AddRange(c.XChildren);
 			entry.ContainerNames.Add(c.ContainerName);
 
-			if (c.ContainerName.EndsWith("AcctInqRec_CType", StringComparison.OrdinalIgnoreCase))
-			{
-				var prefix = c.ContainerName[..^"AcctInqRec_CType".Length];
-				entry.DetectedPrefix = prefix;
-				entry.Pattern = ContainerPattern.MultiAcctInqRec;
-			}
-			else
 			{
 				var prefix = c.ContainerName[..^"InqRs_MType".Length];
 				entry.DetectedPrefix = prefix;
@@ -111,7 +104,7 @@ public sealed class DomainDetector
 		}
 
 		// Detect if already registered
-		report.AlreadyRegisteredInquiry = DomainConfigs.FromRootXsd(_xsdFileName) is { Length: > 0 };
+		report.AlreadyRegisteredInquiry = InquiryConfigs.FromRootXsd(_xsdFileName) is not null;
 		report.AlreadyRegisteredMod = ModificationDomainConfigs.FromRootXsd(_xsdFileName) is not null;
 
 		return report;

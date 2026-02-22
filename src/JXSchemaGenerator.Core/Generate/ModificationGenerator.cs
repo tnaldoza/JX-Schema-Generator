@@ -164,8 +164,7 @@ public sealed class ModificationGenerator
 			});
 	}
 
-	// Resolve the complex type for a given element using the same three strategies
-	// as XElementGenerator
+	// Resolve the complex type for a given element using the standard three strategies
 	private static XmlSchemaComplexType? ResolveComplexType(
 		XmlSchemaElement el,
 		string elName,
@@ -235,7 +234,7 @@ public sealed class ModificationGenerator
 		return null;
 	}
 
-	// Shared particle walker - identical to XElementGenerator
+	// Shared particle walker
 	private static List<XmlSchemaElement> FindChildElements(XmlSchemaComplexType ct)
 	{
 		var list = new List<XmlSchemaElement>();

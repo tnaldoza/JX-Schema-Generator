@@ -127,31 +127,6 @@ foreach (var xsdFile in targets)
 
 	bool wroteAny = false;
 
-	foreach (var inquiryConfig in DomainConfigs.FromRootXsd(xsdFile) ?? [])
-	{
-		var model = new XElementGenerator(inquiryConfig).Generate(index, options);
-
-		var payload = new Dictionary<string, object?>
-		{
-			["version"] = model.Version,
-			["lastUpdated"] = model.LastUpdated,
-			[inquiryConfig.CollectionKeyName] = model.accountTypes,
-		};
-
-		var outPath = Path.Combine(output, inquiryConfig.OutputFileName);
-		JsonEmitter.WriteToFile(outPath, payload);
-		Console.WriteLine($"Wrote: {outPath}");
-
-		CollectEmptyTagWarnings(xsdFile, model.accountTypes
-			.SelectMany(at => at.Value.extendedElements
-				.Where(e => e.schema is null)
-				.Select(e => $"[{at.Key}] {e.name}")),
-			warnings);
-
-		written++;
-		wroteAny = true;
-	}
-
 	var modConfig = ModificationDomainConfigs.FromRootXsd(xsdFile);
 	if (modConfig is not null)
 	{
@@ -173,6 +148,46 @@ foreach (var xsdFile in targets)
 				.Where(s => s.schema is null)
 				.Select(s => $"[{et.Key}] {s.name}")),
 			warnings);
+
+		written++;
+		wroteAny = true;
+	}
+
+	var searchConfig = SrchOpConfigs.FromRootXsd(xsdFile);
+	if (searchConfig is not null)
+	{
+		var searchModel = new SearchGenerator().Generate(index, options);
+
+		var searchPayload = new Dictionary<string, object?>
+		{
+			["version"] = searchModel.Version,
+			["lastUpdated"] = searchModel.LastUpdated,
+			["searchOperations"] = searchModel.searchOperations,
+		};
+
+		var searchPath = Path.Combine(output, searchConfig.OutputFileName);
+		JsonEmitter.WriteToFile(searchPath, searchPayload);
+		Console.WriteLine($"Wrote: {searchPath}");
+
+		written++;
+		wroteAny = true;
+	}
+
+	var InquiryConfig = InquiryConfigs.FromRootXsd(xsdFile);
+	if (InquiryConfig is not null)
+	{
+		var InquiryModel = new InquiryGenerator().Generate(index, options);
+
+		var InquiryPayload = new Dictionary<string, object?>
+		{
+			["version"] = InquiryModel.Version,
+			["lastUpdated"] = InquiryModel.LastUpdated,
+			["inquiryOperations"] = InquiryModel.inquiryOperations,
+		};
+
+		var InquiryPath = Path.Combine(output, InquiryConfig.OutputFileName);
+		JsonEmitter.WriteToFile(InquiryPath, InquiryPayload);
+		Console.WriteLine($"Wrote: {InquiryPath}");
 
 		written++;
 		wroteAny = true;

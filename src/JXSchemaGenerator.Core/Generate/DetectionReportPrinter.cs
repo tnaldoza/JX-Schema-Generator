@@ -19,7 +19,7 @@ public static class DetectionReportPrinter
 
 		Console.WriteLine();
 		Console.WriteLine("  Registration status");
-		Console.WriteLine($"    DomainConfigs             : {(report.AlreadyRegisteredInquiry ? "already registered" : "NOT registered")}");
+		Console.WriteLine($"    InquiryConfigs              : {(report.AlreadyRegisteredInquiry ? "already registered" : "NOT registered")}");
 		Console.WriteLine($"    ModificationDomainConfigs : {(report.AlreadyRegisteredMod ? "already registered" : "NOT registered")}");
 
 		if (report.Inquiry.Count == 0 && report.Modification.Count == 0)
@@ -36,62 +36,13 @@ public static class DetectionReportPrinter
 		{
 			Console.WriteLine();
 			Console.WriteLine("  --------------------------------------------------------------------");
-			Console.WriteLine("  INQUIRY CONFIG  ->  add to DomainConfig.cs");
+			Console.WriteLine("  INQUIRY  ->  auto-discovered by InquiryGenerator (*InqRs_MType with x_ elements)");
 			Console.WriteLine("  --------------------------------------------------------------------");
-
-			var multiGroup = report.Inquiry.Values
-				.Where(e => e.Pattern == ContainerPattern.MultiAcctInqRec)
-				.ToList();
-
-			var singleGroups = report.Inquiry.Values
-				.Where(e => e.Pattern == ContainerPattern.SingleInqRs)
-				.ToList();
-
-			if (multiGroup.Count > 0)
-			{
-				Console.WriteLine();
-				Console.WriteLine("  Pattern : Multiple *AcctInqRec_CType containers");
-				Console.WriteLine("  Suggested config:");
-				Console.WriteLine();
-				Console.WriteLine("    public static readonly DomainConfig <Name> = new()");
-				Console.WriteLine("    {");
-				Console.WriteLine($"        OutputFileName     = \"<name>Elements.json\",");
-				Console.WriteLine($"        ContainerTypeRegex = new Regex(@\"^(?<key>[A-Za-z]+)AcctInqRec_CType$\", RegexOptions.Compiled),");
-				Console.WriteLine($"        OutputOrder        = [{string.Join(", ", multiGroup.Select(e => $"\"{SuggestKey(e.DetectedPrefix, e.Pattern)}\""))}],");
-				Console.WriteLine($"        TypeToEntry        = key => key switch");
-				Console.WriteLine("        {");
-				foreach (var e in multiGroup)
-				{
-					var key = SuggestKey(e.DetectedPrefix, e.Pattern);
-					Console.WriteLine($"            \"{e.DetectedPrefix}\" => new(\"{key}\", \"{SuggestDisplayName(e.DetectedPrefix)}\", []),");
-				}
-				Console.WriteLine("            _  => null,");
-				Console.WriteLine("        },");
-				Console.WriteLine("    };");
-			}
-
-			foreach (var e in singleGroups)
-			{
-				var key = SuggestKey(e.DetectedPrefix, e.Pattern);
-				Console.WriteLine();
-				Console.WriteLine($"  Pattern : Single flat container ({e.ContainerName})");
-				Console.WriteLine("  Suggested config:");
-				Console.WriteLine();
-				Console.WriteLine($"    public static readonly DomainConfig <Name> = new()");
-				Console.WriteLine("    {");
-				Console.WriteLine($"        OutputFileName     = \"<name>Elements.json\",");
-				Console.WriteLine($"        ContainerTypeRegex = new Regex(@\"^(?<key>{e.DetectedPrefix})InqRs_MType$\", RegexOptions.Compiled),");
-				Console.WriteLine($"        OutputOrder        = [\"{key}\"],");
-				Console.WriteLine($"        TypeToEntry        = key => key switch");
-				Console.WriteLine("        {");
-				Console.WriteLine($"            \"{e.DetectedPrefix}\" => new(\"{key}\", \"{SuggestDisplayName(e.DetectedPrefix)}\", []),");
-				Console.WriteLine("            _  => null,");
-				Console.WriteLine("        },");
-				Console.WriteLine("    };");
-			}
+			Console.WriteLine();
+			Console.WriteLine($"  {report.Inquiry.Count} response type(s) with extended elements found.");
+			Console.WriteLine();
 
 			// Validation results per x_ element
-			Console.WriteLine();
 			Console.WriteLine("  x_ element validation (real tag counts from expansion pipeline):");
 			Console.WriteLine();
 			Console.WriteLine($"    {"Element",-42} {"Strategy",-14} {"Type Resolved",-36} Tags");
@@ -115,9 +66,12 @@ public static class DetectionReportPrinter
 				}
 			}
 
-			Console.WriteLine();
-			Console.WriteLine("  Add to DomainConfigs.FromRootXsd:");
-			Console.WriteLine($"    \"{xsd.ToLowerInvariant()}\" => <Name>,");
+			if (!report.AlreadyRegisteredInquiry)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  Add to InquiryConfigs.FromRootXsd in OperationConfig.cs:");
+				Console.WriteLine($"    \"{xsd.ToLowerInvariant()}\" => new() {{ OutputFileName = \"<name>InquiryElements.json\" }},");
+			}
 		}
 
 		// MODIFICATION
