@@ -111,14 +111,7 @@ jobs:
             **TPG version**: ${{ github.event.inputs.version || 'latest' }}
             **Commit**: ${{ github.sha }}
 
-            ## Usage in @ffb/jxchange
-
-            ```bash
-            npm run download-schemas
-            ```
-
-            Or download `jxchange-schemas.zip` from this release manually and
-            extract it to `./src/soap/utils/schemas/`.
+            Download `jxchange-schemas.zip` from this release manually
           files: jxchange-schemas.zip
           make_latest: true
         env:
