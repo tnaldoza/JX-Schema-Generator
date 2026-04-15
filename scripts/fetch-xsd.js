@@ -43,7 +43,7 @@ const VERSION_ARG = (() => {
   return idx !== -1 ? process.argv[idx + 1] : null;
 })();
 
-// ! LATEST RELEASED VERSIONS AS OF 02/21/2026
+// ! LATEST RELEASED VERSIONS AS OF 04/15/2026
 // Hardcoded fallback list - update when JackHenry publishes new releases
 const FALLBACK_ZIPS = [
   "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2026.0.01_XSD.zip",
@@ -329,7 +329,9 @@ function extractTargetFiles(zipPath, outDir) {
   const depFiles = [];
 
   for (const { filename, data } of iterZipEntries(buf)) {
-    const basename = path.basename(filename);
+    // ZIP entries from Windows-built archives use backslash separators.
+    // On Linux, path.basename() treats '\' as a literal character, so normalize first.
+    const basename = path.basename(filename.replace(/\\/g, "/"));
     if (MASTER_XSD_RE.test(basename)) {
       fs.writeFileSync(path.join(outDir, basename), data);
       masterFiles.push(basename);
@@ -340,6 +342,20 @@ function extractTargetFiles(zipPath, outDir) {
   }
 
   return { masterFiles, depFiles };
+}
+
+/**
+ * Renames any files in dir whose names contain backslashes (Windows ZIP paths
+ * treated as literal filenames on Linux) to their trailing basename component.
+ */
+function normalizeBackslashNames(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.includes("\\")) continue;
+    const normalized = entry.name.replace(/\\/g, "/").split("/").pop();
+    if (normalized && normalized !== entry.name) {
+      fs.renameSync(path.join(dir, entry.name), path.join(dir, normalized));
+    }
+  }
 }
 
 /**
@@ -356,6 +372,9 @@ function extractFromZip(zipPath, outDir) {
     );
     // unzip preserves the nested folder structure; flatten everything into outDir
     flattenTargetFiles(outDir);
+    // On Linux, Windows-style ZIP entries (backslash paths) land as literal
+    // filenames with '\' in them. Rename any such files to their basename.
+    normalizeBackslashNames(outDir);
     return countExtracted(outDir);
   } catch {
     // system unzip not available or pattern match failed - use Node fallback
