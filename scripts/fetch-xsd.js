@@ -46,6 +46,7 @@ const VERSION_ARG = (() => {
 // ! LATEST RELEASED VERSIONS AS OF 02/21/2026
 // Hardcoded fallback list - update when JackHenry publishes new releases
 const FALLBACK_ZIPS = [
+  "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2026.0.01_XSD.zip",
   "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2026.0.00_XSD.zip",
   "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2025.1.05_XSD.zip",
   "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2025.1.04_XSD.zip",
