@@ -27,6 +27,14 @@ public sealed class ModificationDomainConfig
 	/// </summary>
 	public required Func<string, EntityMapping?> TypeToEntry { get; init; }
 
+	/// <summary>
+	/// Handles multi-mod containers where one request type (e.g. AcctModRq_MType)
+	/// contains multiple *Mod children that each map to a separate entity.
+	/// Maps mod element name (e.g. "DepMod") to an EntityMapping.
+	/// Used when TypeToEntry returns null for the captured key.
+	/// </summary>
+	public Func<string, EntityMapping?>? ModChildToEntry { get; init; }
+
 	public string[] OutputOrder { get; init; } = [];
 
 	// Elements inside *ModRq_MType to skip - infrastructure, not mod sections
@@ -101,22 +109,18 @@ public static class ModificationDomainConfigs
 		},
 	};
 
-	// Deposit: DepAcctModRq_MType, TimeDepAcctModRq_MType, SafeDepAcctModRq_MType, TrckAcctModRq_MType
+	// Deposit: AcctModRq_MType (multi-mod: DepMod, TimeDepMod, SafeDepMod, TrckMod)
 	//          AcctSweepModRq_MType, AcctCombStmtModRq_MType, AcctProdOvrrdModRq_MType
 	//          TaxPlnModRq_MType, TaxPlnBenfModRq_MType, AcctBenfModRq_MType, AcctAnlysModRq_MType
 	public static readonly ModificationDomainConfig Deposit = new()
 	{
 		OutputFileName = "depositModificationElements.json",
 		ContainerTypeRegex = new Regex(
-			@"^(?<key>[A-Za-z]+)AcctModRq_MType$|^(?<key>AcctSweep|AcctCombStmt|AcctProdOvrrd|TaxPln|TaxPlnBenf|AcctBenf|AcctAnlys)ModRq_MType$",
+			@"^(?<key>[A-Za-z]*)AcctModRq_MType$|^(?<key>AcctSweep|AcctCombStmt|AcctProdOvrrd|TaxPln|TaxPlnBenf|AcctBenf|AcctAnlys)ModRq_MType$",
 			RegexOptions.Compiled),
 		OutputOrder = ["D", "T", "B", "C", "AcctSweep", "AcctCombStmt", "AcctProdOvrrd", "TaxPln", "TaxPlnBenf", "AcctBenf", "AcctAnlys"],
 		TypeToEntry = key => key switch
 		{
-			"Dep" => new("D", "Deposit/Checking/Savings", ["S", "X"]),
-			"TimeDep" => new("T", "Time Deposit/CD", []),
-			"SafeDep" => new("B", "Safe Deposit Box", []),
-			"Trck" => new("C", "Collection/Trust", []),
 			"AcctSweep" => new("AcctSweep", "Account Sweep", []),
 			"AcctCombStmt" => new("AcctCombStmt", "Combined Statement", []),
 			"AcctProdOvrrd" => new("AcctProdOvrrd", "Product Override", []),
@@ -124,6 +128,14 @@ public static class ModificationDomainConfigs
 			"TaxPlnBenf" => new("TaxPlnBenf", "Tax Plan Beneficiary", []),
 			"AcctBenf" => new("AcctBenf", "Account Beneficiary", []),
 			"AcctAnlys" => new("AcctAnlys", "Account Analysis", []),
+			_ => null,
+		},
+		ModChildToEntry = modName => modName switch
+		{
+			"DepMod" => new("D", "Deposit/Checking/Savings", ["S", "X"]),
+			"TimeDepMod" => new("T", "Time Deposit/CD", []),
+			"SafeDepMod" => new("B", "Safe Deposit Box", []),
+			"TrckMod" => new("C", "Collection/Trust", []),
 			_ => null,
 		},
 	};

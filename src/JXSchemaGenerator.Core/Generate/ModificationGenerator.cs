@@ -45,9 +45,17 @@ public sealed class ModificationGenerator
 
 			var capturedKey = match.Groups["key"].Value;
 			var mapping = _config.TypeToEntry(capturedKey);
-			if (mapping is null) continue;
-
 			var targetNs = kvp.Key.Namespace;
+
+			if (mapping is null && _config.ModChildToEntry is not null)
+			{
+				// Multi-mod pattern: one container has multiple *Mod children,
+				// each mapping to a separate entity (e.g. AcctModRq_MType -> DepMod, TimeDepMod, …)
+				ProcessMultiMod(kvp.Value, targetNs, index, expander, root);
+				continue;
+			}
+
+			if (mapping is null) continue;
 
 			string modStructureName;
 			List<XmlSchemaElement> sectionEls;
@@ -71,30 +79,7 @@ public sealed class ModificationGenerator
 
 			if (sectionEls.Count == 0) continue;
 
-			if (!root.entityTypes.TryGetValue(mapping.Key, out var entity))
-			{
-				entity = new ModificationEntityType
-				{
-					name = mapping.DisplayName,
-					aliases = [.. mapping.Aliases],
-					modificationStructure = modStructureName,
-				};
-				root.entityTypes[mapping.Key] = entity;
-			}
-
-			// Each section element maps to a modificationSection entry
-			foreach (var sectionEl in sectionEls)
-			{
-				var sectionName = sectionEl.Name ?? sectionEl.QualifiedName.Name;
-				if (entity.modificationSections.Any(s => s.name == sectionName)) continue;
-
-				entity.modificationSections.Add(new ModificationSection
-				{
-					name = sectionName,
-					description = TryGetDoc(sectionEl),
-					schema = ResolveSchemaForElement(sectionEl, sectionName, targetNs, index, expander),
-				});
-			}
+			AddEntitySections(mapping, modStructureName, sectionEls, targetNs, index, expander, root);
 		}
 
 		// Apply output order
@@ -106,6 +91,86 @@ public sealed class ModificationGenerator
 		root.entityTypes = ordered.ToDictionary(k => k, k => root.entityTypes[k]);
 
 		return root;
+	}
+
+	/// <summary>
+	/// Multi-mod pattern: the container has multiple *Mod children (e.g. AcctModRq_MType
+	/// contains DepMod, TimeDepMod, SafeDepMod, TrckMod). Each *Mod child maps to a
+	/// separate entity via <see cref="ModificationDomainConfig.ModChildToEntry"/>.
+	/// </summary>
+	private void ProcessMultiMod(
+		XmlSchemaComplexType rqType,
+		string targetNs,
+		SchemaIndex index,
+		TypeExpander expander,
+		ModificationElementsRoot root)
+	{
+		foreach (var modEl in FindAllModElements(rqType))
+		{
+			var modName = modEl.Name ?? modEl.QualifiedName.Name;
+			var mapping = _config.ModChildToEntry!(modName);
+			if (mapping is null) continue;
+
+			var modCType = ResolveComplexType(modEl, modName, targetNs, index);
+			if (modCType is null) continue;
+
+			var sectionEls = FindSectionElements(modCType).ToList();
+			if (sectionEls.Count == 0) continue;
+
+			AddEntitySections(mapping, modName, sectionEls, targetNs, index, expander, root);
+		}
+	}
+
+	private static void AddEntitySections(
+		EntityMapping mapping,
+		string modStructureName,
+		List<XmlSchemaElement> sectionEls,
+		string targetNs,
+		SchemaIndex index,
+		TypeExpander expander,
+		ModificationElementsRoot root)
+	{
+		if (!root.entityTypes.TryGetValue(mapping.Key, out var entity))
+		{
+			entity = new ModificationEntityType
+			{
+				name = mapping.DisplayName,
+				aliases = [.. mapping.Aliases],
+				modificationStructure = modStructureName,
+			};
+			root.entityTypes[mapping.Key] = entity;
+		}
+
+		foreach (var sectionEl in sectionEls)
+		{
+			var sectionName = sectionEl.Name ?? sectionEl.QualifiedName.Name;
+			if (entity.modificationSections.Any(s => s.name == sectionName)) continue;
+
+			entity.modificationSections.Add(new ModificationSection
+			{
+				name = sectionName,
+				description = TryGetDoc(sectionEl),
+				schema = ResolveSchemaForElement(sectionEl, sectionName, targetNs, index, expander),
+			});
+		}
+	}
+
+	/// <summary>
+	/// Finds ALL *Mod wrapper elements inside a *ModRq type (for multi-mod containers).
+	/// </summary>
+	private static List<XmlSchemaElement> FindAllModElements(XmlSchemaComplexType rqType)
+	{
+		return FindChildElements(rqType)
+			.Where(e =>
+			{
+				var name = e.Name ?? e.QualifiedName.Name;
+				return !ModificationDomainConfig.SkippedRqElements.Contains(name)
+					&& !name.StartsWith("Ver_", StringComparison.OrdinalIgnoreCase)
+					&& name.EndsWith("Mod", StringComparison.OrdinalIgnoreCase)
+					&& (e.SchemaTypeName.Name.EndsWith("_CType", StringComparison.OrdinalIgnoreCase)
+						|| e.ElementSchemaType is XmlSchemaComplexType);
+			})
+			.ToList();
 	}
 
 	/// <summary>
