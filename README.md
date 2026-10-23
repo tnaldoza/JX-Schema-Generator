@@ -9,8 +9,56 @@ build modification request bodies.
 
 ## Requirements
 
-- .NET 10 SDK
-- JXChange XSD schema files in a local folder
+- .NET 10 SDK 10.0.100 or newer, since `global.json` rolls forward to the newest installed 10.0 feature band
+- pnpm 12 for the Node tooling, which downloads the pnpm and Node versions declared in `package.json` `devEngines` when the installed ones do not match
+
+## Development
+
+```sh
+pnpm install          # installs the Node tooling and the lefthook git hooks
+dotnet tool restore   # installs CSharpier and ReportGenerator from .config/dotnet-tools.json
+pnpm fetch:xsd        # downloads the newest TPG XSD zip into ./schemas
+pnpm generate         # writes the JSON mappings into ./dist/schemas
+pnpm test             # runs the xUnit v3 tests on Microsoft.Testing.Platform
+```
+
+| Script                      | What it does                                                        |
+| --------------------------- | ------------------------------------------------------------------- |
+| `pnpm fetch:xsd`            | Downloads the newest TPG release listed on the Jack Henry Downloads page |
+| `pnpm fetch:xsd:all`        | Downloads every listed TPG release into `./schemas/R<version>/`, which `generate` reads with `--input schemas/R<version>` |
+| `pnpm fetch:xsd:version X`  | Downloads one release, for example `2026.1.00`                      |
+| `pnpm generate`             | Runs the `generate` command over `./schemas`                        |
+| `pnpm detect`               | Runs the `detect` command over `./schemas`                          |
+| `pnpm format`               | Formats with Prettier and CSharpier                                 |
+| `pnpm format:check`         | Checks Prettier and CSharpier formatting                            |
+| `pnpm lint`                 | Checks Prettier formatting and runs markdownlint                    |
+
+Tooling:
+
+- **Formatting:** CSharpier owns C# and MSBuild files, Prettier owns JSON, YAML and JavaScript, and markdownlint-cli2 owns Markdown
+- **Analyzers:** the SDK's built-in CA rules at `latest-recommended`, with code style enforced on build and every warning except advisories treated as an error in CI
+- **Packages:** versions live only in `Directory.Packages.props` (Central Package Management), and CI rejects any `packages.lock.json`
+- **Git hooks:** lefthook formats staged files on commit, runs commitlint on the message, and builds before push
+- **Commits:** Conventional Commits with a sentence-case subject, checked by commitlint locally and on PR titles in CI
+
+Jack Henry lists only the two newest TPG releases on <https://jackhenry.dev/jxchange-soap/documentation/> and deletes superseded zips, so `./schemas` is gitignored and always downloaded.
+
+## Releases
+
+The **Release** workflow is started by hand from the Actions tab, with an optional `tpg-version` input.
+It fetches the XSDs, generates the mappings and publishes `jxchange-schemas.zip` with a `SHA256SUMS` file and a build provenance attestation.
+Tags take the form `tpg-<tpg version>-<short sha>`, for example `tpg-2026.1.00-1a2b3c4`.
+The **TPG watch** workflow checks the Downloads page daily and opens an issue when a TPG release has not been published here yet.
+
+Verify a downloaded bundle with:
+
+```sh
+gh attestation verify jxchange-schemas.zip -R tnaldoza/JX-Schema-Generator
+```
+
+jXchange is a trademark of Jack Henry & Associates, Inc.
+This project is not affiliated with or endorsed by Jack Henry.
+Releases contain generated mappings only, never the vendor XSD, WSDL or zip files.
 
 ---
 
@@ -21,16 +69,16 @@ build modification request bodies.
 Processes master XSD files and writes JSON element mapping files to the output folder.
 
 ```txt
-dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input <SchemaFolder> [--root <XsdFile>] [--out <OutputFolder>] [--strict true|false]
+dotnet run --project src/JXSchemaGenerator.Cli -- generate --input <SchemaFolder> [--root <XsdFile>] [--out <OutputFolder>] [--strict true|false]
 ```
 
 ### `detect`
 
-Analyses a master XSD and prints a config recommendation report with exact tag counts.
+Analyzes a master XSD and prints a config recommendation report with exact tag counts.
 Use this when adding a new XSD to determine what config entries are needed.
 
 ```txt
-dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input <SchemaFolder> [--root <XsdFile>] [--strict true|false]
+dotnet run --project src/JXSchemaGenerator.Cli -- detect --input <SchemaFolder> [--root <XsdFile>] [--strict true|false]
 ```
 
 #### **Arguments**
@@ -39,20 +87,20 @@ dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input <SchemaFolder
 |-----------|----------|---------------|---------------------------------------------------------|
 | `--input` | yes      |               | Folder containing all XSD files                         |
 | `--root`  | no       |               | Single XSD file to process. Omit to process all masters |
-| `--out`   | no       | `.\artifacts` | Output folder for generated JSON (`generate` only)      |
-| `--strict`| no       | `true`        | Fail on schema compile errors                           |
+| `--out`   | no       | `artifacts` | Output folder for generated JSON (`generate` only)      |
+| `--strict`| no       | `true`        | No effect yet; a Master XSD that fails to compile always fails the run |
 
 #### **Examples**
 
 ```txt
 # Process all registered master XSDs
-dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --out .\artifacts
+dotnet run --project src/JXSchemaGenerator.Cli -- generate --input schemas --out artifacts
 
 # Process a single XSD
-dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --root tpg_depositmaster.xsd --out .\artifacts
+dotnet run --project src/JXSchemaGenerator.Cli -- generate --input schemas --root TPG_DepositMaster.xsd --out artifacts
 
 # Detect config needed for a new XSD
-dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input .\schemas --root tpg_newmaster.xsd
+dotnet run --project src/JXSchemaGenerator.Cli -- detect --input schemas --root TPG_NewMaster.xsd
 ```
 
 ---
@@ -93,9 +141,9 @@ XferSrchRq_MType  →  strip "Rq_MType"  →  "XferSrch"  →  append "Rec_CType
 
 ---
 
-## Four Operation Families
+## Operation Families
 
-The generator handles three distinct operation families, each with its own generator and config type.
+The generator handles four operation families, each with its own generator and config type.
 
 ### Inquiry (`*InqRq_MType`)
 
@@ -189,7 +237,7 @@ responseSchema
 
 ## Output Files
 
-Each registered XSD produces up to three files — one per generator family.
+Each registered XSD produces up to four files — one per generator family.
 
 | Root XSD                      | Inquiry output                    | Add output                        | Search output                    | Modification output                       |
 |-------------------------------|-----------------------------------|-----------------------------------|----------------------------------|-------------------------------------------|
@@ -331,11 +379,11 @@ The `isArray: true` marker on a node indicates that its parent element is an XML
 ### `OperationConfig.cs` — Inquiry and Search
 
 Both inquiry and search generators are **fully auto-discovering**. The only config needed is
-the output file name, registered in two static classes:
+the output file name, registered in static classes:
 
 ```csharp
 // InquiryConfigs — maps XSD file name -> inquiry output file name
-// SearchConfigs  — maps XSD file name -> search output file name
+// SrchOpConfigs  — maps XSD file name -> search output file name
 public static class InquiryConfigs
 {
     public static OperationConfig? FromRootXsd(string rootXsd) =>
@@ -387,7 +435,7 @@ public static readonly ModificationDomainConfig Deposit = new()
 ### Step 1 — Run `detect`
 
 ```txt
-dotnet run --project .\src\JXSchemaGenerator.Cli -- detect --input .\schemas --root tpg_newmaster.xsd
+dotnet run --project src/JXSchemaGenerator.Cli -- detect --input schemas --root TPG_NewMaster.xsd
 ```
 
 The report shows:
@@ -417,7 +465,7 @@ to `ModificationDomainConfigs` in `ModificationDomainConfig.cs`, then register i
 ### Step 4 — Run and verify
 
 ```txt
-dotnet run --project .\src\JXSchemaGenerator.Cli -- generate --input .\schemas --root tpg_newmaster.xsd --out .\artifacts
+dotnet run --project src/JXSchemaGenerator.Cli -- generate --input schemas --root TPG_NewMaster.xsd --out artifacts
 ```
 
 The summary at the end reports any sections that resolved zero tags. If any are listed,
@@ -457,7 +505,7 @@ src/
     Emit/
       JsonEmitter.cs                  JSON serialization helper
     Expand/
-      ExpansionOptions.cs             Controls tag expansion behaviour (leaf-only, skip-any, etc.)
+      ExpansionOptions.cs             Controls tag expansion behavior (leaf-only, skip-any, etc.)
       TypeExpander.cs                 Recursively expands XSD complex types into schema trees
     Generate/
       OperationConfig.cs              InquiryConfigs + SrchOpConfigs registries (add new XSDs here)
@@ -466,7 +514,7 @@ src/
       AddGenerator.cs                 Auto-discovers *AddRq_MType, emits addOperations
       SearchGenerator.cs              Auto-discovers *SrchRq_MType, emits searchOperations
       ModificationGenerator.cs        Regex-driven modification section expander
-      DomainDetector.cs               Analyses an XSD index and produces a DetectionReport
+      DomainDetector.cs               Analyzes an XSD index and produces a DetectionReport
       DetectionReportPrinter.cs       Renders a DetectionReport to the console
       Models/
         InquiryModels.cs              Output model for inquiry files
@@ -477,10 +525,11 @@ src/
     Schema/
       SchemaIndex.cs                  In-memory index of all compiled XSD complex types
       SchemaLoader.cs                 Loads and compiles XSD files into XmlSchemaSet
-      LocalFolderXmlResolver.cs       Resolves XSD xs:include / xs:import from a local folder
+      LocalFolderXmlResolver.cs       Resolves xs:include / xs:import by file name inside the schema folder, never over the network
 tests/
   JXSchemaGenerator.Tests/
-    UnitTest1.cs
+    Schema/
+      LocalFolderXmlResolverTests.cs
 ```
 
 ---
