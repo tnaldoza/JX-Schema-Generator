@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using System.Xml;
-
 using JXSchemaGenerator.Expand;
 using JXSchemaGenerator.Generate.Models;
 using JXSchemaGenerator.Schema;
@@ -15,15 +14,13 @@ namespace JXSchemaGenerator.Generate;
 ///                    derived by swapping Rq_MType -> Rs_MType
 /// Add operations do not use the x_* extended element mechanism.
 /// </summary>
-public sealed class AddGenerator
+public static class AddGenerator
 {
-	private static readonly HashSet<string> SkippedRqElements =
-		new(StringComparer.OrdinalIgnoreCase) { "MsgRqHdr" };
+	private static readonly HashSet<string> SkippedRqElements = new(StringComparer.OrdinalIgnoreCase) { "MsgRqHdr" };
 
-	private static readonly HashSet<string> SkippedRsElements =
-		new(StringComparer.OrdinalIgnoreCase) { "MsgRsHdr" };
+	private static readonly HashSet<string> SkippedRsElements = new(StringComparer.OrdinalIgnoreCase) { "MsgRsHdr" };
 
-	public AddElementsRoot Generate(SchemaIndex index, ExpansionOptions options)
+	public static AddElementsRoot Generate(SchemaIndex index, ExpansionOptions options)
 	{
 		var expander = new TypeExpander(index, options);
 		var root = new AddElementsRoot();
@@ -33,7 +30,8 @@ public sealed class AddGenerator
 			var typeName = kvp.Key.Name;
 
 			// Only process *AddRq_MType types
-			if (!typeName.EndsWith("AddRq_MType", StringComparison.Ordinal)) continue;
+			if (!typeName.EndsWith("AddRq_MType", StringComparison.Ordinal))
+				continue;
 
 			// Derive element name: CustAddRq_MType -> CustAdd  (strip "Rq_MType")
 			var elementName = typeName[..^"Rq_MType".Length];
@@ -52,8 +50,7 @@ public sealed class AddGenerator
 
 			// Response schema: JXChange naming convention Rq_MType -> Rs_MType
 			JsonNode? responseSchema = null;
-			var rsTypeName = new XmlQualifiedName(
-				typeName[..^"Rq_MType".Length] + "Rs_MType", targetNs);
+			var rsTypeName = new XmlQualifiedName(typeName[..^"Rq_MType".Length] + "Rs_MType", targetNs);
 
 			if (index.ComplexTypes.ContainsKey(rsTypeName))
 			{
@@ -76,9 +73,7 @@ public sealed class AddGenerator
 		}
 
 		// Sort alphabetically
-		root.addOperations = root.addOperations
-			.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
-			.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+		root.addOperations = root.addOperations.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
 		return root;
 	}

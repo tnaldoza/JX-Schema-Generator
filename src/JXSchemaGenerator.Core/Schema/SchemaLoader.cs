@@ -1,12 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Xml;
 using System.Xml.Schema;
 
 namespace JXSchemaGenerator.Schema;
 
-public sealed class SchemaLoader
+public static class SchemaLoader
 {
 	public sealed record LoadResult(XmlSchemaSet SchemaSet, string RootFile);
 
@@ -23,7 +20,7 @@ public sealed class SchemaLoader
 		"http://www.w3.org/2005/08/addressing",
 	];
 
-	public LoadResult LoadAndCompileRoot(string folderPath, string rootXsdFileName, bool strict)
+	public static LoadResult LoadAndCompileRoot(string folderPath, string rootXsdFileName, bool strict)
 	{
 		var folder = Path.GetFullPath(folderPath);
 		var rootPath = Path.Combine(folder, rootXsdFileName);
@@ -44,39 +41,43 @@ public sealed class SchemaLoader
 				// infrastructure schemas.  These never affect JXChange domain content.
 				if (IsInfrastructureError(e.Message))
 				{
-					if (warnings.Count < 50) warnings.Add($"[infra-demoted] {msg}");
+					if (warnings.Count < 50)
+						warnings.Add($"[infra-demoted] {msg}");
 				}
 				else
 				{
-					if (errors.Count < 200) errors.Add(msg);
-					else if (errors.Count == 200) errors.Add("... (truncated after 200 errors)");
+					if (errors.Count < 200)
+						errors.Add(msg);
+					else if (errors.Count == 200)
+						errors.Add("... (truncated after 200 errors)");
 				}
 			}
 			else
 			{
-				if (warnings.Count < 50) warnings.Add(msg);
-				else if (warnings.Count == 50) warnings.Add("... (more warnings truncated)");
+				if (warnings.Count < 50)
+					warnings.Add(msg);
+				else if (warnings.Count == 50)
+					warnings.Add("... (more warnings truncated)");
 			}
 		};
 
 		var resolver = new LocalFolderXmlResolver(folder);
 
-		var set = new XmlSchemaSet
-		{
-			XmlResolver = resolver
-		};
+		var set = new XmlSchemaSet { XmlResolver = resolver };
 		set.ValidationEventHandler += handler;
 
 		using var fs = File.OpenRead(rootPath);
-		using var reader = XmlReader.Create(fs, new XmlReaderSettings
-		{
-			DtdProcessing = DtdProcessing.Ignore,
-			XmlResolver = resolver,
-			CloseInput = true
-		});
+		using var reader = XmlReader.Create(
+			fs,
+			new XmlReaderSettings
+			{
+				DtdProcessing = DtdProcessing.Ignore,
+				XmlResolver = resolver,
+				CloseInput = true,
+			}
+		);
 
-		var schema = XmlSchema.Read(reader, handler)
-			?? throw new InvalidOperationException($"XmlSchema.Read returned null for {rootPath}");
+		var schema = XmlSchema.Read(reader, handler) ?? throw new InvalidOperationException($"XmlSchema.Read returned null for {rootPath}");
 
 		schema.SourceUri = new Uri(Path.GetFullPath(rootPath)).AbsoluteUri;
 
@@ -93,12 +94,9 @@ public sealed class SchemaLoader
 
 		if (errors.Count > 0)
 		{
-			var warnText = warnings.Count > 0
-				? "\nWarnings (first):\n" + string.Join("\n", warnings)
-				: "";
+			var warnText = warnings.Count > 0 ? "\nWarnings (first):\n" + string.Join("\n", warnings) : "";
 
-			throw new InvalidOperationException(
-				$"Schema compile failed for root '{rootXsdFileName}'. First errors:\n{string.Join("\n", errors)}{warnText}");
+			throw new InvalidOperationException($"Schema compile failed for root '{rootXsdFileName}'. First errors:\n{string.Join("\n", errors)}{warnText}");
 		}
 
 		return new LoadResult(set, rootXsdFileName);

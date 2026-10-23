@@ -1,7 +1,6 @@
 using System.Text.Json.Nodes;
 using System.Xml;
 using System.Xml.Schema;
-
 using JXSchemaGenerator.Schema;
 
 namespace JXSchemaGenerator.Expand;
@@ -48,7 +47,8 @@ public sealed class TypeExpander
 
 	public HashSet<string> ExpandComplexType(XmlQualifiedName ctName, int depth, HashSet<XmlQualifiedName> stack)
 	{
-		if (depth > _opt.MaxDepth) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		if (depth > _opt.MaxDepth)
+			return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 		if (_memo.TryGetValue(ctName, out var cached))
 			return new HashSet<string>(cached, StringComparer.OrdinalIgnoreCase);
@@ -67,9 +67,11 @@ public sealed class TypeExpander
 		}
 
 		// Handle complexContent extension/restriction
-		if (ct.ContentModel is XmlSchemaComplexContent complexContent &&
-			complexContent.Content is XmlSchemaComplexContentExtension ext &&
-			!ext.BaseTypeName.IsEmpty)
+		if (
+			ct.ContentModel is XmlSchemaComplexContent complexContent
+			&& complexContent.Content is XmlSchemaComplexContentExtension ext
+			&& !ext.BaseTypeName.IsEmpty
+		)
 		{
 			// expand base first
 			foreach (var t in ExpandComplexType(ext.BaseTypeName, depth + 1, stack))
@@ -92,20 +94,17 @@ public sealed class TypeExpander
 		return result;
 	}
 
-	private void ExpandComplexTypeObject(
-	XmlSchemaComplexType ct,
-	HashSet<string> tags,
-	int depth,
-	HashSet<XmlSchemaObject> stack)
+	private void ExpandComplexTypeObject(XmlSchemaComplexType ct, HashSet<string> tags, int depth, HashSet<XmlSchemaObject> stack)
 	{
-		if (depth > _opt.MaxDepth) return;
-		if (stack.Contains(ct)) return; // cycle break for anonymous types
+		if (depth > _opt.MaxDepth)
+			return;
+		if (stack.Contains(ct))
+			return; // cycle break for anonymous types
 
 		stack.Add(ct);
 
 		// complexContent extension support
-		if (ct.ContentModel is XmlSchemaComplexContent complexContent &&
-			complexContent.Content is XmlSchemaComplexContentExtension ext)
+		if (ct.ContentModel is XmlSchemaComplexContent complexContent && complexContent.Content is XmlSchemaComplexContentExtension ext)
 		{
 			// Expand base if it's a named type we can find
 			if (!ext.BaseTypeName.IsEmpty)
@@ -168,7 +167,8 @@ public sealed class TypeExpander
 				if (el.ElementSchemaType is XmlSchemaComplexType verCt)
 					ExpandComplexTypeObject(verCt, tags, depth + 1, new HashSet<XmlSchemaObject>());
 				else if (!el.SchemaTypeName.IsEmpty)
-					foreach (var t in ExpandComplexType(el.SchemaTypeName, depth + 1, stack)) tags.Add(t);
+					foreach (var t in ExpandComplexType(el.SchemaTypeName, depth + 1, stack))
+						tags.Add(t);
 
 				return;
 			}
@@ -215,7 +215,8 @@ public sealed class TypeExpander
 
 		if (obj is XmlSchemaAny any)
 		{
-			if (_opt.SkipAny) return;
+			if (_opt.SkipAny)
+				return;
 			tags.Add("*");
 			return;
 		}
@@ -231,9 +232,7 @@ public sealed class TypeExpander
 	{
 		if (element.ElementSchemaType is XmlSchemaComplexType ct)
 		{
-			return ct.QualifiedName.IsEmpty
-				? ExpandComplexTypeToTree(ct, 0, [])
-				: ExpandToTree(ct.QualifiedName, 0, []);
+			return ct.QualifiedName.IsEmpty ? ExpandComplexTypeToTree(ct, 0, []) : ExpandToTree(ct.QualifiedName, 0, []);
 		}
 		if (!element.SchemaTypeName.IsEmpty)
 			return ExpandToTree(element.SchemaTypeName, 0, []);
@@ -249,9 +248,12 @@ public sealed class TypeExpander
 	/// </summary>
 	public JsonNode? ExpandToTree(XmlQualifiedName ctName, int depth, HashSet<XmlQualifiedName> stack)
 	{
-		if (depth > _opt.MaxDepth) return null;
-		if (stack.Contains(ctName)) return null;
-		if (!_index.ComplexTypes.TryGetValue(ctName, out var ct)) return null;
+		if (depth > _opt.MaxDepth)
+			return null;
+		if (stack.Contains(ctName))
+			return null;
+		if (!_index.ComplexTypes.TryGetValue(ctName, out var ct))
+			return null;
 
 		stack.Add(ctName);
 		var result = ExpandComplexTypeToTree(ct, depth, stack);
@@ -259,14 +261,14 @@ public sealed class TypeExpander
 		return result;
 	}
 
-	private JsonNode? ExpandComplexTypeToTree(XmlSchemaComplexType ct, int depth, HashSet<XmlQualifiedName> stack)
+	private JsonObject? ExpandComplexTypeToTree(XmlSchemaComplexType ct, int depth, HashSet<XmlQualifiedName> stack)
 	{
-		if (depth > _opt.MaxDepth) return null;
+		if (depth > _opt.MaxDepth)
+			return null;
 
 		var obj = new JsonObject();
 
-		if (ct.ContentModel is XmlSchemaComplexContent complexContent &&
-			complexContent.Content is XmlSchemaComplexContentExtension ext)
+		if (ct.ContentModel is XmlSchemaComplexContent complexContent && complexContent.Content is XmlSchemaComplexContentExtension ext)
 		{
 			if (!ext.BaseTypeName.IsEmpty)
 			{
@@ -366,17 +368,31 @@ public sealed class TypeExpander
 			return;
 		}
 
-		if (schemaObj is XmlSchemaSequence seq2) { ExpandParticleIntoTree(seq2, obj, depth + 1, stack); return; }
-		if (schemaObj is XmlSchemaChoice choice2) { ExpandParticleIntoTree(choice2, obj, depth + 1, stack); return; }
-		if (schemaObj is XmlSchemaAll all2) { ExpandParticleIntoTree(all2, obj, depth + 1, stack); return; }
+		if (schemaObj is XmlSchemaSequence seq2)
+		{
+			ExpandParticleIntoTree(seq2, obj, depth + 1, stack);
+			return;
+		}
+		if (schemaObj is XmlSchemaChoice choice2)
+		{
+			ExpandParticleIntoTree(choice2, obj, depth + 1, stack);
+			return;
+		}
+		if (schemaObj is XmlSchemaAll all2)
+		{
+			ExpandParticleIntoTree(all2, obj, depth + 1, stack);
+			return;
+		}
 		if (schemaObj is XmlSchemaGroupRef gr)
 		{
-			if (gr.Particle is not null) ExpandParticleIntoTree(gr.Particle, obj, depth + 1, stack);
+			if (gr.Particle is not null)
+				ExpandParticleIntoTree(gr.Particle, obj, depth + 1, stack);
 			return;
 		}
 		if (schemaObj is XmlSchemaAny)
 		{
-			if (!_opt.SkipAny) obj["*"] = null;
+			if (!_opt.SkipAny)
+				obj["*"] = null;
 			return;
 		}
 	}

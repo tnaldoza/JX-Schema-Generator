@@ -38,31 +38,30 @@ public sealed class SchemaIndex
 	public SchemaIndexDump ToDump(int maxNames = 200)
 	{
 		var ctNames = new List<string>(maxNames);
-		foreach (var k in ComplexTypes.Keys.OrderBy(k => k.Name))
+		foreach (var k in ComplexTypes.Keys.OrderBy(k => k.Name, StringComparer.Ordinal))
 		{
-			if (ctNames.Count >= maxNames) break;
+			if (ctNames.Count >= maxNames)
+				break;
 			ctNames.Add($"{k.Namespace}|{k.Name}");
 		}
 
 		var elNames = new List<string>(maxNames);
-		foreach (var k in GlobalElements.Keys.OrderBy(k => k.Name))
+		foreach (var k in GlobalElements.Keys.OrderBy(k => k.Name, StringComparer.Ordinal))
 		{
-			if (elNames.Count >= maxNames) break;
+			if (elNames.Count >= maxNames)
+				break;
 			elNames.Add($"{k.Namespace}|{k.Name}");
 		}
 
-		return new SchemaIndexDump(
-			ComplexTypes.Count,
-			SimpleTypes.Count,
-			GlobalElements.Count,
-			ctNames,
-			elNames
-		);
+		return new SchemaIndexDump(ComplexTypes.Count, SimpleTypes.Count, GlobalElements.Count, ctNames, elNames);
 	}
 
-	public XmlSchemaComplexType GetComplexTypeOrThrow(XmlQualifiedName name) => ComplexTypes.TryGetValue(name, out var ct) ? ct : throw new KeyNotFoundException($"ComplexType not found: {name}");
+	public XmlSchemaComplexType GetComplexTypeOrThrow(XmlQualifiedName name) =>
+		ComplexTypes.TryGetValue(name, out var ct) ? ct : throw new KeyNotFoundException($"ComplexType not found: {name}");
 
-	public XmlSchemaElement GetElementOrThrow(XmlQualifiedName name) => GlobalElements.TryGetValue(name, out var el) ? el : throw new KeyNotFoundException($"GlobalElement not found: {name}");
+	public XmlSchemaElement GetElementOrThrow(XmlQualifiedName name) =>
+		GlobalElements.TryGetValue(name, out var el) ? el : throw new KeyNotFoundException($"GlobalElement not found: {name}");
 
-	public override string ToString() => $"SchemaIndex: ComplexTypes={ComplexTypes.Count}, SimpleTypes={SimpleTypes.Count}, GlobalElements={GlobalElements.Count}";
+	public override string ToString() =>
+		$"SchemaIndex: ComplexTypes={ComplexTypes.Count}, SimpleTypes={SimpleTypes.Count}, GlobalElements={GlobalElements.Count}";
 }

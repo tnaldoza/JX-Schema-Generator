@@ -1,38 +1,35 @@
 root = true
 
+# * All files
+# ! end_of_line must agree with .gitattributes
 [*]
 charset = utf-8
-end_of_line = crlf
+end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
-
-[*.{cs,csx}]
 indent_style = tab
 indent_size = 4
 tab_width = 4
+
+[*.{ps1,cmd,bat}]
+end_of_line = crlf
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ! YAML forbids tabs, and indent_size must match the tabWidth override in .prettierrc
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.{cs,csx}]
 max_line_length = 160
-
-# Disable tabs/spaces warning since we use tabs
-dotnet_diagnostic.SA1027.severity = none
-dotnet_diagnostic.CA1873.severity = none
-dotnet_diagnostic.CA1848.severity = none
-dotnet_diagnostic.SA1636.severity = none
-# SA1200 - top-level statements have no namespace to put usings inside
-dotnet_diagnostic.SA1200.severity = none
-
-[*.{json,yml,yaml}]
-indent_style = space
-indent_size = 2
-
-[*.{xml,csproj,fsproj,vbproj,proj,slnx,props,targets,config,nuspec}]
-indent_style = space
-indent_size = 2
 
 #### .NET Coding Conventions ####
 [*.{cs,vb}]
 
 # Organize usings
-dotnet_separate_import_directive_groups = true
+dotnet_separate_import_directive_groups = false
 dotnet_sort_system_directives_first = true
 file_header_template = unset
 
@@ -123,7 +120,7 @@ csharp_style_prefer_readonly_struct_member = true:suggestion
 # Code-block preferences
 csharp_prefer_braces = true:silent
 csharp_prefer_simple_using_statement = true:suggestion
-csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_namespace_declarations = file_scoped
 csharp_style_prefer_method_group_conversion = true:silent
 csharp_style_prefer_primary_constructors = true:suggestion
 csharp_style_prefer_top_level_statements = true:silent
@@ -383,3 +380,13 @@ dotnet_naming_style.s_camelcase.required_prefix = s_
 dotnet_naming_style.s_camelcase.required_suffix =
 dotnet_naming_style.s_camelcase.word_separator =
 dotnet_naming_style.s_camelcase.capitalization = camel_case
+
+#### Analyzer severities ####
+[*.cs]
+
+# ! CSharpier owns layout
+dotnet_diagnostic.IDE0055.severity = none
+
+# * Enforced on build
+dotnet_diagnostic.IDE0005.severity = warning
+dotnet_diagnostic.IDE0161.severity = warning

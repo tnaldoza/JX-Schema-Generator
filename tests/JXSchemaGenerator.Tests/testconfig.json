@@ -1,0 +1,11 @@
+{
+	"platformOptions": {
+		"Coverlet": {
+			"include": "[JXSchemaGenerator.Core]*",
+			"excludeByAttribute": "GeneratedCode,ExcludeFromCodeCoverage,CompilerGeneratedAttribute",
+			"format": "cobertura",
+			"skipAutoProps": true,
+			"excludeAssembliesWithoutSources": "MissingAll"
+		}
+	}
+}

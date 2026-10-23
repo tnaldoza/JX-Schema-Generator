@@ -1,0 +1,53 @@
+# ! No dotnet-sdk ecosystem: global.json is a roll-forward floor, not a pin
+# ! pnpm is pinned in package.json devEngines, which Dependabot does not edit; bump it with pnpm self-update
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+      include: scope
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # ! Must stay above pnpm-workspace.yaml's minimumReleaseAge (1440 minutes)
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      # ! xunit.v3, Microsoft.Testing and coverlet constrain each other and must move together
+      test-platform:
+        patterns: ["xunit.v3*", "Microsoft.Testing.*", "coverlet.*"]
+      dotnet-tools:
+        patterns: ["csharpier", "dotnet-reportgenerator-globaltool"]
+    commit-message:
+      prefix: chore
+      include: scope

@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dotnet:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reject NuGet lock files
+        run: |
+          if git ls-files -- '*packages.lock.json' | grep -q .; then
+              echo "::error::packages.lock.json is not allowed in this repository"
+              exit 1
+          fi
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - run: dotnet --version
+      - run: dotnet tool restore
+      - run: dotnet csharpier check .
+      - run: dotnet restore JXSchemaGenerator.slnx
+      - run: dotnet build JXSchemaGenerator.slnx -c Release --no-restore
+      - name: Test
+        run: >-
+          dotnet test --solution JXSchemaGenerator.slnx -c Release --no-build
+          --results-directory artifacts/test-results
+          --minimum-expected-tests 1
+          --report-gh
+          --report-xunit-trx --report-xunit-trx-filename JXSchemaGenerator.Tests.trx
+          --coverlet --coverlet-output-format cobertura --coverlet-file-prefix JXSchemaGenerator.Tests
+      - name: Coverage summary
+        if: ${{ !cancelled() && hashFiles('artifacts/test-results/*.cobertura.*.xml') != '' }}
+        run: |
+          dotnet reportgenerator "-reports:artifacts/test-results/*.cobertura.*.xml" -targetdir:artifacts/coverage "-reporttypes:MarkdownSummaryGithub;HtmlInline"
+          cat artifacts/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: test-results
+          path: |
+            artifacts/test-results
+            artifacts/coverage
+          retention-days: 14
+
+  nuget-audit:
+    name: NuGet audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - run: dotnet restore JXSchemaGenerator.slnx --force -p:NuGetAuditGate=true
+
+  lint:
+    name: Prettier and markdownlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          require-lockfile: true
+      - run: pnpm run lint

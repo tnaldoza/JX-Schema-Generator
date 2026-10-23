@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using System.Xml;
-
 using JXSchemaGenerator.Expand;
 using JXSchemaGenerator.Generate.Models;
 using JXSchemaGenerator.Schema;
@@ -14,15 +13,13 @@ namespace JXSchemaGenerator.Generate;
 ///   responseSchema - the response envelope fields (MsgRsHdr header stripped)
 ///                    derived by swapping Rq_MType -> Rs_MType
 /// </summary>
-public sealed class InquiryGenerator
+public static class InquiryGenerator
 {
-	private static readonly HashSet<string> SkippedRqElements =
-		new(StringComparer.OrdinalIgnoreCase) { "MsgRqHdr" };
+	private static readonly HashSet<string> SkippedRqElements = new(StringComparer.OrdinalIgnoreCase) { "MsgRqHdr" };
 
-	private static readonly HashSet<string> SkippedRsElements =
-		new(StringComparer.OrdinalIgnoreCase) { "MsgRsHdr" };
+	private static readonly HashSet<string> SkippedRsElements = new(StringComparer.OrdinalIgnoreCase) { "MsgRsHdr" };
 
-	public InquiryElementsRoot Generate(SchemaIndex index, ExpansionOptions options)
+	public static InquiryElementsRoot Generate(SchemaIndex index, ExpansionOptions options)
 	{
 		var expander = new TypeExpander(index, options);
 		var root = new InquiryElementsRoot();
@@ -32,7 +29,8 @@ public sealed class InquiryGenerator
 			var typeName = kvp.Key.Name;
 
 			// Only process *InqRq_MType types
-			if (!typeName.EndsWith("InqRq_MType", StringComparison.Ordinal)) continue;
+			if (!typeName.EndsWith("InqRq_MType", StringComparison.Ordinal))
+				continue;
 
 			// Derive element name: AcctSweepInqRq_MType -> AcctSweepInq  (strip "Rq_MType")
 			var elementName = typeName[..^"Rq_MType".Length];
@@ -52,8 +50,7 @@ public sealed class InquiryGenerator
 			// Response schema: JXChange naming convention Rq_MType -> Rs_MType
 			// (every *InqRq_MType has a matching *InqRs_MType for the response envelope)
 			JsonNode? responseSchema = null;
-			var rsTypeName = new XmlQualifiedName(
-				typeName[..^"Rq_MType".Length] + "Rs_MType", targetNs);
+			var rsTypeName = new XmlQualifiedName(typeName[..^"Rq_MType".Length] + "Rs_MType", targetNs);
 
 			if (index.ComplexTypes.ContainsKey(rsTypeName))
 			{
@@ -70,9 +67,11 @@ public sealed class InquiryGenerator
 			// Patch IncXtendElemArray in the request: replace XtendElem: null with the
 			// actual list of x_* element names from the response. These are the valid
 			// values you pass in IncXtendElemInfo/XtendElem to get that data back.
-			if (requestSchema is JsonObject reqObj
+			if (
+				requestSchema is JsonObject reqObj
 				&& reqObj["IncXtendElemArray"] is JsonObject incXtendObj
-				&& incXtendObj["IncXtendElemInfo"] is JsonObject elemInfoObj)
+				&& incXtendObj["IncXtendElemInfo"] is JsonObject elemInfoObj
+			)
 			{
 				var xNames = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 				CollectXNames(responseSchema, xNames);
@@ -80,7 +79,8 @@ public sealed class InquiryGenerator
 				if (xNames.Count > 0)
 				{
 					var namesArray = new JsonArray();
-					foreach (var n in xNames) namesArray.Add(JsonValue.Create(n));
+					foreach (var n in xNames)
+						namesArray.Add(JsonValue.Create(n));
 					elemInfoObj["XtendElem"] = namesArray;
 				}
 			}
@@ -94,8 +94,8 @@ public sealed class InquiryGenerator
 		}
 
 		// Sort alphabetically
-		root.inquiryOperations = root.inquiryOperations
-			.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+		root.inquiryOperations = root
+			.inquiryOperations.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
 			.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
 		return root;
@@ -108,10 +108,12 @@ public sealed class InquiryGenerator
 	/// </summary>
 	private static void CollectXNames(JsonNode? node, SortedSet<string> names)
 	{
-		if (node is not JsonObject obj) return;
+		if (node is not JsonObject obj)
+			return;
 		foreach (var (key, value) in obj)
 		{
-			if (key.Equals("isArray", StringComparison.OrdinalIgnoreCase)) continue;
+			if (key.Equals("isArray", StringComparison.OrdinalIgnoreCase))
+				continue;
 			if (key.StartsWith("x_", StringComparison.OrdinalIgnoreCase))
 				names.Add(key);
 			else

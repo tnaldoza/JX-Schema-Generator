@@ -1,0 +1,3 @@
+{
+	"recommendations": ["csharpier.csharpier-vscode", "esbenp.prettier-vscode", "DavidAnson.vscode-markdownlint", "ms-dotnettools.csdevkit"]
+}

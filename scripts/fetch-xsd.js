@@ -1,18 +1,15 @@
 /**
- * Downloads the latest JXChange TPG XSD zip from JackHenry's public
- * GitHub-hosted developer assets - NO authentication required.
+ * Downloads jXchange TPG XSD zips listed on the Jack Henry Downloads page, with no authentication
  *
- * Zip structure inside the download:
- *   TPG_R<VER>_XSD/
- *     R<VER>TPGPub/
- *       Validation/
- *         TPG_CustomerMaster.xsd   <- extracted (*Master.xsd)
- *         TPG_DepositMaster.xsd    <- extracted (*Master.xsd)
- *         oasis-*.xsd              <- extracted (dependency schemas)
- *         w3-*.xsd                 <- extracted (dependency schemas)
- *         w3-*.dtd                 <- extracted (dependency schemas)
- *         TPG_Customer.wsdl        <- ignored
- *         ...
+ * Zip layout:
+ *   R<VER>TPGPub/
+ *     Validation/
+ *       TPG_CustomerMaster.xsd   <- extracted (*Master.xsd)
+ *       oasis-*.xsd              <- extracted (dependency schemas)
+ *       w3-*.xsd                 <- extracted (dependency schemas)
+ *       w3-*.dtd                 <- extracted (dependency schemas)
+ *       TPG_Customer.wsdl        <- ignored
+ *       ...
  *
  * Extracted files:
  *   - `*Master.xsd`  : JXChange domain schemas
@@ -21,9 +18,9 @@
  *   - `w3-*.dtd`     : W3C DTD files (required by XmlSchemaSet compiler)
  *
  * Usage:
- *   node scripts/fetch-xsd.js                   # latest only (default)
- *   node scripts/fetch-xsd.js --all             # all available versions
- *   node scripts/fetch-xsd.js --version 2026.0.00
+ *   node scripts/fetch-xsd.js                   # newest listed release into ./schemas
+ *   node scripts/fetch-xsd.js --all             # every listed release into ./schemas/R<VER>/
+ *   node scripts/fetch-xsd.js --version 2026.1.00
  *
  * Env vars:
  *   OUTPUT_DIR   Extraction target (default: ./schemas)
@@ -32,466 +29,278 @@
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { pipeline } = require("stream/promises");
+const { parseArgs } = require("util");
 const zlib = require("zlib");
-const { execSync } = require("child_process");
 
-const OUTPUT_DIR =
-  process.env.OUTPUT_DIR || path.join(process.cwd(), "schemas");
-const DOWNLOAD_ALL = process.argv.includes("--all");
-const VERSION_ARG = (() => {
-  const idx = process.argv.findIndex((a) => a === "--version");
-  return idx !== -1 ? process.argv[idx + 1] : null;
-})();
+const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(process.cwd(), "schemas");
 
-// ! LATEST RELEASED VERSIONS AS OF 04/15/2026
-// Hardcoded fallback list - update when JackHenry publishes new releases
-const FALLBACK_ZIPS = [
-  "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2026.0.01_XSD.zip",
-  "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2026.0.00_XSD.zip",
-  "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2025.1.05_XSD.zip",
-  "https://jkhy.github.io/devrel-assets//cms-files/soap/TPG_R2025.1.04_XSD.zip",
-];
+const DOWNLOADS_PAGE = "https://jackhenry.dev/jxchange-soap/documentation/";
+const ZIP_BASE = "https://jkhy.github.io/devrel-assets/cms-files/soap/";
+
+// ! Jack Henry lists only the two most recent releases and deletes older zips
+// Used when the downloads page lists no TPG zips, as of 2026-10-22
+const FALLBACK_ZIPS = [`${ZIP_BASE}TPG_R2026.1.00_XSD.zip`, `${ZIP_BASE}TPG_R2026.0.06_XSD.zip`];
+
+const REQUEST_TIMEOUT_MS = 60_000;
 
 // JXChange domain schemas
-const MASTER_XSD_RE = /TPG_\w+Master\.xsd$/i;
+const MASTER_XSD_RE = /^TPG_\w+Master\.xsd$/i;
 
-// OASIS WS-Security and W3C dependency schemas required by the XmlSchemaSet compiler.
-// These are bundled in the zip alongside the Master XSDs and must be present in the
-// same output folder so LocalFolderXmlResolver can find them by filename.
+// ! OASIS and W3C dependency schemas must sit next to the Master XSDs, since LocalFolderXmlResolver only looks in that folder
 const DEPS_RE = /^(?:oasis-[^/\\]+\.xsd|w3-[^/\\]+\.xsd|w3-[^/\\]+\.dtd)$/i;
 
-/** Returns true for any file that should land in the output directory. */
-function isExtractTarget(basename) {
-  return MASTER_XSD_RE.test(basename) || DEPS_RE.test(basename);
+/**
+ * Resolves with the response for url after following redirects
+ *
+ * @throws {Error} On a non-2xx status, too many redirects, or an idle socket past REQUEST_TIMEOUT_MS
+ */
+function get(url, hops = 0) {
+	return new Promise((resolve, reject) => {
+		if (hops > 5) return reject(new Error("Too many redirects"));
+		const req = https.get(url, { headers: { "User-Agent": "JXSchemaGenerator/1.0" }, timeout: REQUEST_TIMEOUT_MS }, (res) => {
+			if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+				res.resume();
+				return resolve(get(new URL(res.headers.location, url).toString(), hops + 1));
+			}
+			if (res.statusCode < 200 || res.statusCode >= 300) {
+				res.resume();
+				return reject(new Error(`HTTP ${res.statusCode}: ${url}`));
+			}
+			resolve(res);
+		});
+		req.on("timeout", () => req.destroy(new Error(`Timed out after ${REQUEST_TIMEOUT_MS} ms: ${url}`)));
+		req.on("error", reject);
+	});
 }
 
-function fetchText(url) {
-  return new Promise((resolve, reject) => {
-    const follow = (u, hops = 0) => {
-      if (hops > 5) return reject(new Error("Too many redirects"));
-      https
-        .get(
-          u,
-          { headers: { "User-Agent": "JXSchemaGenerator/1.0" } },
-          (res) => {
-            if (
-              res.statusCode >= 300 &&
-              res.statusCode < 400 &&
-              res.headers.location
-            ) {
-              res.resume();
-              return follow(
-                new URL(res.headers.location, u).toString(),
-                hops + 1,
-              );
-            }
-            const chunks = [];
-            res.on("data", (c) => chunks.push(c));
-            res.on("end", () =>
-              resolve(Buffer.concat(chunks).toString("utf-8")),
-            );
-          },
-        )
-        .on("error", reject);
-    };
-    follow(url);
-  });
+async function fetchText(url) {
+	const res = await get(url);
+	const chunks = [];
+	for await (const chunk of res) chunks.push(chunk);
+	return Buffer.concat(chunks).toString("utf-8");
 }
 
-function fetchJson(url, extraHeaders = {}) {
-  return new Promise((resolve, reject) => {
-    const follow = (u, hops = 0) => {
-      if (hops > 5) return reject(new Error("Too many redirects"));
-      https
-        .get(
-          u,
-          {
-            headers: {
-              "User-Agent": "JXSchemaGenerator/1.0",
-              Accept: "application/vnd.github+json",
-              ...extraHeaders,
-            },
-          },
-          (res) => {
-            if (
-              res.statusCode >= 300 &&
-              res.statusCode < 400 &&
-              res.headers.location
-            ) {
-              res.resume();
-              return follow(
-                new URL(res.headers.location, u).toString(),
-                hops + 1,
-              );
-            }
-            const chunks = [];
-            res.on("data", (c) => chunks.push(c));
-            res.on("end", () => {
-              const text = Buffer.concat(chunks).toString("utf-8");
-              if (res.statusCode !== 200) {
-                return reject(
-                  new Error(`HTTP ${res.statusCode}: ${text.slice(0, 200)}`),
-                );
-              }
-              try {
-                resolve(JSON.parse(text));
-              } catch (e) {
-                reject(new Error(`Invalid JSON from GitHub: ${e.message}`));
-              }
-            });
-          },
-        )
-        .on("error", reject);
-    };
-    follow(url);
-  });
-}
+async function downloadFile(url, dest) {
+	const res = await get(url);
+	const total = parseInt(res.headers["content-length"] || "0", 10);
+	let received = 0;
 
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    const follow = (u, hops = 0) => {
-      if (hops > 5) return reject(new Error("Too many redirects"));
-      https
-        .get(
-          u,
-          { headers: { "User-Agent": "JXSchemaGenerator/1.0" } },
-          (res) => {
-            if (
-              res.statusCode >= 300 &&
-              res.statusCode < 400 &&
-              res.headers.location
-            ) {
-              res.resume();
-              return follow(
-                new URL(res.headers.location, u).toString(),
-                hops + 1,
-              );
-            }
-            if (res.statusCode !== 200)
-              return reject(new Error(`HTTP ${res.statusCode}: ${u}`));
+	res.on("data", (chunk) => {
+		received += chunk.length;
+		if (total && process.stdout.isTTY) {
+			const pct = Math.round((received / total) * 100);
+			process.stdout.write(`\r    ${pct}% (${(received / 1024).toFixed(0)} / ${(total / 1024).toFixed(0)} KB)`);
+		}
+	});
 
-            const total = parseInt(res.headers["content-length"] || "0");
-            let received = 0;
-            const file = fs.createWriteStream(dest);
-
-            res.on("data", (chunk) => {
-              received += chunk.length;
-              if (total && process.stdout.isTTY) {
-                const pct = Math.round((received / total) * 100);
-                process.stdout.write(
-                  `\r    ${pct}% (${(received / 1024).toFixed(0)} / ${(total / 1024).toFixed(0)} KB)`,
-                );
-              }
-            });
-            res.pipe(file);
-            file.on("finish", () => {
-              if (process.stdout.isTTY) process.stdout.write("\n");
-              file.close(resolve);
-            });
-            file.on("error", reject);
-          },
-        )
-        .on("error", reject);
-    };
-    follow(url);
-  });
+	// ! pipeline rejects on a dropped connection, where pipe would leave the promise pending and exit 0
+	await pipeline(res, fs.createWriteStream(dest));
+	if (process.stdout.isTTY) process.stdout.write("\n");
+	if (total && received !== total) throw new Error(`Truncated download: ${received} of ${total} bytes from ${url}`);
 }
 
 function parseVer(filename) {
-  const m = filename.match(/TPG_R(\d+)\.(\d+)\.(\d+)_XSD/i);
-  return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
+	const m = filename.match(/TPG_R(\d+)\.(\d+)\.(\d+)_XSD/i);
+	return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
 }
 function newerFirst(a, b) {
-  const va = parseVer(path.basename(a)),
-    vb = parseVer(path.basename(b));
-  for (let i = 0; i < 3; i++) if (va[i] !== vb[i]) return vb[i] - va[i];
-  return 0;
-}
-
-async function discoverZipsFromGithubContents() {
-  const apiUrl =
-    "https://api.github.com/repos/jkhy/devrel-assets/contents/cms-files/soap";
-  const token = process.env.JX_GH_READ_TOKEN || process.env.GITHUB_TOKEN;
-
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-  const items = await fetchJson(apiUrl, headers);
-
-  if (!Array.isArray(items)) {
-    throw new Error("Unexpected GitHub API response (expected an array).");
-  }
-
-  const found = items
-    .filter((x) => x && x.type === "file" && typeof x.name === "string")
-    .filter((x) => /TPG_R[\d.]+_XSD\.zip/i.test(x.name))
-    .map((x) => x.download_url)
-    .filter(Boolean);
-
-  return found;
+	const va = parseVer(path.basename(a)),
+		vb = parseVer(path.basename(b));
+	for (let i = 0; i < 3; i++) if (va[i] !== vb[i]) return vb[i] - va[i];
+	return 0;
 }
 
 async function discoverZips() {
-  const found = new Set();
+	const found = new Set();
 
-  // 1) GitHub Contents API
-  try {
-    console.log("  Scanning: GitHub Contents API");
-    const zips = await discoverZipsFromGithubContents();
-    zips.forEach((u) => found.add(u));
-    if (found.size > 0) {
-      console.log(`  Found ${found.size} TPG XSD zip(s) via GitHub API`);
-      return Array.from(found).sort(newerFirst);
-    }
-  } catch (e) {
-    console.log(
-      `  GitHub API scan failed (${e.message}), trying HTML scans...`,
-    );
-  }
+	// ! The downloads page writes unquoted href attributes
+	const HREF_RE = /href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
 
-  // 2) HTML scans
-  const HREF_RE = /href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
+	try {
+		console.log(`  Scanning: ${DOWNLOADS_PAGE}`);
+		const html = await fetchText(DOWNLOADS_PAGE);
 
-  for (const url of [
-    "https://jackhenry.dev/jxchange-soap/documentation/",
-    "https://jkhy.github.io/devrel-assets/cms-files/soap/",
-  ]) {
-    try {
-      console.log(`  Scanning: ${url}`);
-      const html = await fetchText(url);
+		let m;
+		while ((m = HREF_RE.exec(html)) !== null) {
+			const href = (m[1] || m[2] || m[3] || "").trim();
+			const name = href.match(/TPG_R[\d.]+_XSD\.zip$/i);
+			if (name) found.add(`${ZIP_BASE}${name[0]}`);
+		}
 
-      let m;
-      while ((m = HREF_RE.exec(html)) !== null) {
-        const href = (m[1] || m[2] || m[3] || "").trim();
-        if (!/TPG_R[\d.]+_XSD\.zip/i.test(href)) continue;
+		console.log(`  Found ${found.size} TPG XSD zip(s)`);
+	} catch (e) {
+		console.log(`  Scan failed (${e.message})`);
+	}
 
-        found.add(
-          href.startsWith("http")
-            ? href
-            : `https://jkhy.github.io/devrel-assets/${href.replace(/^\/+/, "")}`,
-        );
-      }
+	if (found.size === 0) {
+		console.log("  Using hardcoded fallback URLs");
+		FALLBACK_ZIPS.forEach((u) => found.add(u));
+	}
 
-      if (found.size > 0) {
-        console.log(`  Found ${found.size} TPG XSD zip(s)`);
-        break;
-      }
-    } catch (e) {
-      console.log(`  Scan failed (${e.message}), trying next...`);
-    }
-  }
-
-  // 3) Last resort: hardcoded
-  if (found.size === 0) {
-    console.log("  Using hardcoded fallback URLs");
-    FALLBACK_ZIPS.forEach((u) => found.add(u));
-  }
-
-  return Array.from(found).sort(newerFirst);
+	return Array.from(found).sort(newerFirst);
 }
 
 /**
- * Reads a ZIP buffer and yields each entry as:
- *   { filename, data: Buffer }
- * Uses the local file header sequence (works for flat or nested zips).
+ * Yields every file entry in a ZIP buffer as { filename, inflate }, where inflate() returns the entry's bytes
+ *
+ * ! Sizes come from the central directory because Jack Henry's zips set the data-descriptor flag and leave every local header size at 0
+ * @see https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
  */
 function* iterZipEntries(buf) {
-  let offset = 0;
-  while (offset < buf.length - 30) {
-    const sig = buf.readUInt32LE(offset);
-    if (sig !== 0x04034b50) break; // local file header magic
+	let eocd = -1;
+	for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 0xffff); i--) {
+		// ! A signature inside the archive comment is not the record unless the comment runs exactly to the end of the file
+		if (buf.readUInt32LE(i) === 0x06054b50 && i + 22 + buf.readUInt16LE(i + 20) === buf.length) {
+			eocd = i;
+			break;
+		}
+	}
+	if (eocd === -1) throw new Error("Invalid ZIP: end of central directory not found");
 
-    const compression = buf.readUInt16LE(offset + 8);
-    const compressedSz = buf.readUInt32LE(offset + 18);
-    const filenameLen = buf.readUInt16LE(offset + 26);
-    const extraLen = buf.readUInt16LE(offset + 28);
-    const filename = buf.toString(
-      "utf-8",
-      offset + 30,
-      offset + 30 + filenameLen,
-    );
-    const dataStart = offset + 30 + filenameLen + extraLen;
-    const compressed = buf.slice(dataStart, dataStart + compressedSz);
+	const count = buf.readUInt16LE(eocd + 10);
+	let pos = buf.readUInt32LE(eocd + 16);
 
-    if (!filename.endsWith("/")) {
-      const data =
-        compression === 8 ? zlib.inflateRawSync(compressed) : compressed;
-      yield { filename, data };
-    }
+	for (let n = 0; n < count; n++) {
+		if (buf.readUInt32LE(pos) !== 0x02014b50) throw new Error("Invalid ZIP: bad central directory entry");
 
-    offset = dataStart + compressedSz;
-  }
-}
+		const compression = buf.readUInt16LE(pos + 10);
+		const compressedSize = buf.readUInt32LE(pos + 20);
+		const uncompressedSize = buf.readUInt32LE(pos + 24);
+		const nameLen = buf.readUInt16LE(pos + 28);
+		const extraLen = buf.readUInt16LE(pos + 30);
+		const commentLen = buf.readUInt16LE(pos + 32);
+		const localOffset = buf.readUInt32LE(pos + 42);
+		const filename = buf.toString("utf-8", pos + 46, pos + 46 + nameLen);
+		pos += 46 + nameLen + extraLen + commentLen;
 
-/** Node-native fallback: extract all target files from the zip buffer. */
-function extractTargetFiles(zipPath, outDir) {
-  const buf = fs.readFileSync(zipPath);
-  const masterFiles = [];
-  const depFiles = [];
+		if (filename.endsWith("/")) continue;
 
-  for (const { filename, data } of iterZipEntries(buf)) {
-    // ZIP entries from Windows-built archives use backslash separators.
-    // On Linux, path.basename() treats '\' as a literal character, so normalize first.
-    const basename = path.basename(filename.replace(/\\/g, "/"));
-    if (MASTER_XSD_RE.test(basename)) {
-      fs.writeFileSync(path.join(outDir, basename), data);
-      masterFiles.push(basename);
-    } else if (DEPS_RE.test(basename)) {
-      fs.writeFileSync(path.join(outDir, basename), data);
-      depFiles.push(basename);
-    }
-  }
-
-  return { masterFiles, depFiles };
+		const inflate = () => {
+			if (compression !== 0 && compression !== 8) throw new Error(`Unsupported compression method ${compression} for ${filename}`);
+			const start = localOffset + 30 + buf.readUInt16LE(localOffset + 26) + buf.readUInt16LE(localOffset + 28);
+			const compressed = buf.subarray(start, start + compressedSize);
+			// ! maxOutputLength caps a lying entry at its declared size
+			const data = compression === 8 ? zlib.inflateRawSync(compressed, { maxOutputLength: Math.max(1, uncompressedSize) }) : compressed;
+			if (data.length !== uncompressedSize) throw new Error(`Size mismatch for ${filename}: ${data.length} of ${uncompressedSize} bytes`);
+			return data;
+		};
+		yield { filename, inflate };
+	}
 }
 
 /**
- * Renames any files in dir whose names contain backslashes (Windows ZIP paths
- * treated as literal filenames on Linux) to their trailing basename component.
- */
-function normalizeBackslashNames(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.includes("\\")) continue;
-    const normalized = entry.name.replace(/\\/g, "/").split("/").pop();
-    if (normalized && normalized !== entry.name) {
-      fs.renameSync(path.join(dir, entry.name), path.join(dir, normalized));
-    }
-  }
-}
-
-/**
- * Extraction strategy:
- * 1. Try system `unzip` with multiple patterns - fast and handles large zips
- * 2. Fall back to pure-Node entry-by-entry read (iterZipEntries)
+ * Writes the Master XSDs and their dependency schemas from the zip flat into outDir
+ *
+ * ! Only basenames are written, which also blocks zip-slip paths
  */
 function extractFromZip(zipPath, outDir) {
-  try {
-    // Extract Master XSDs and all dependency schemas in one pass
-    execSync(
-      `unzip -o "${zipPath}" "*Master.xsd" "oasis-*.xsd" "w3-*.xsd" "w3-*.dtd" -d "${outDir}"`,
-      { stdio: "pipe" },
-    );
-    // unzip preserves the nested folder structure; flatten everything into outDir
-    flattenTargetFiles(outDir);
-    // On Linux, Windows-style ZIP entries (backslash paths) land as literal
-    // filenames with '\' in them. Rename any such files to their basename.
-    normalizeBackslashNames(outDir);
-    return countExtracted(outDir);
-  } catch {
-    // system unzip not available or pattern match failed - use Node fallback
-  }
+	const masterFiles = [];
+	const depFiles = [];
+	const written = new Set();
 
-  const { masterFiles, depFiles } = extractTargetFiles(zipPath, outDir);
-  return { masterFiles, depFiles };
+	for (const { filename, inflate } of iterZipEntries(fs.readFileSync(zipPath))) {
+		// ! Older zips were built on Windows with backslash separators, which path.basename ignores on Linux
+		const normalized = filename.replaceAll("\\", "/");
+		if (normalized.startsWith("__MACOSX/") || normalized.includes("/__MACOSX/")) continue;
+
+		const basename = path.basename(normalized);
+		const bucket = MASTER_XSD_RE.test(basename) ? masterFiles : DEPS_RE.test(basename) ? depFiles : null;
+		if (!bucket) continue;
+
+		if (written.has(basename.toLowerCase())) throw new Error(`Duplicate file name in zip: ${basename}`);
+		written.add(basename.toLowerCase());
+
+		fs.writeFileSync(path.join(outDir, basename), inflate());
+		bucket.push(basename);
+	}
+
+	return { masterFiles, depFiles };
 }
 
 /**
- * Move any target files found in sub-directories up to outDir and remove empty dirs.
- * Deletes any non-target files that unzip placed in sub-directories.
+ * Deletes schema files a previous fetch left at the top of dir, so releases never mix
+ *
+ * ! Only names the fetcher itself writes are removed, since OUTPUT_DIR can point anywhere
  */
-function flattenTargetFiles(dir) {
-  const walk = (d) => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-        try {
-          fs.rmdirSync(full);
-        } catch {
-          /* not empty, leave it */
-        }
-      } else if (isExtractTarget(entry.name) && d !== dir) {
-        fs.renameSync(full, path.join(dir, entry.name));
-      } else if (!isExtractTarget(entry.name) && d !== dir) {
-        fs.unlinkSync(full); // delete non-target files from sub-dirs
-      }
-    }
-  };
-  walk(dir);
-}
-
-/** Returns { masterFiles, depFiles } arrays of filenames present in dir. */
-function countExtracted(dir) {
-  const masterFiles = [];
-  const depFiles = [];
-  for (const f of fs.readdirSync(dir)) {
-    if (MASTER_XSD_RE.test(f)) masterFiles.push(f);
-    else if (DEPS_RE.test(f)) depFiles.push(f);
-  }
-  return { masterFiles, depFiles };
+function clearPreviousSchemas(dir) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		if (entry.isFile() && (MASTER_XSD_RE.test(entry.name) || DEPS_RE.test(entry.name))) fs.rmSync(path.join(dir, entry.name));
+	}
 }
 
 async function main() {
-  console.log("");
-  console.log("JXChange TPG XSD Fetcher");
-  console.log("");
-  console.log("Discovering available TPG XSD zips...");
+	console.log("");
+	console.log("JXChange TPG XSD Fetcher");
+	console.log("");
 
-  const allZips = await discoverZips();
+	const { values: args } = parseArgs({
+		options: {
+			all: { type: "boolean", default: false },
+			version: { type: "string" },
+		},
+		strict: true,
+	});
 
-  // Select targets
-  let targets;
-  if (VERSION_ARG) {
-    targets = allZips.filter((u) => u.includes(VERSION_ARG));
-    if (targets.length === 0) {
-      throw new Error(
-        `No zip found matching version "${VERSION_ARG}".\nAvailable:\n` +
-          allZips.map((u) => `  ${path.basename(u)}`).join("\n"),
-      );
-    }
-  } else if (DOWNLOAD_ALL) {
-    targets = allZips;
-  } else {
-    targets = [allZips[0]]; // latest only
-  }
+	let targets;
+	if (args.version !== undefined) {
+		if (!/^\d{4}\.\d+\.\d{2}$/.test(args.version)) {
+			throw new Error(`Invalid version "${args.version}", expected e.g. 2026.1.00`);
+		}
+		targets = [`${ZIP_BASE}TPG_R${args.version}_XSD.zip`];
+	} else {
+		console.log("Discovering available TPG XSD zips...");
+		const allZips = await discoverZips();
+		targets = args.all ? allZips : [allZips[0]];
+	}
 
-  const multiVersion = targets.length > 1;
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+	const multiVersion = targets.length > 1;
+	fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  const tmpDir = path.join(process.cwd(), ".tmp-fetch-xsd");
-  fs.mkdirSync(tmpDir, { recursive: true });
+	const tmpDir = path.join(process.cwd(), ".tmp-fetch-xsd");
+	fs.mkdirSync(tmpDir, { recursive: true });
 
-  for (const url of targets) {
-    const filename = decodeURIComponent(path.basename(url));
-    const verMatch = filename.match(/R([\d.]+)_XSD/);
-    const version = verMatch ? verMatch[1] : filename;
+	try {
+		for (const url of targets) {
+			const filename = decodeURIComponent(path.basename(url));
+			const verMatch = filename.match(/R([\d.]+)_XSD/);
+			const version = verMatch ? verMatch[1] : filename;
 
-    console.log("");
-    console.log(`Downloading: ${filename}`);
+			console.log("");
+			console.log(`Downloading: ${filename}`);
 
-    const tmpZip = path.join(tmpDir, filename);
-    await downloadFile(url, tmpZip);
-    console.log(`\t${(fs.statSync(tmpZip).size / 1024).toFixed(0)} KB`);
+			const tmpZip = path.join(tmpDir, filename);
+			await downloadFile(url, tmpZip);
+			console.log(`\t${(fs.statSync(tmpZip).size / 1024).toFixed(0)} KB`);
 
-    // Multi-version mode: extract into versioned sub-folders
-    const extractDir = multiVersion
-      ? path.join(OUTPUT_DIR, `R${version}`)
-      : OUTPUT_DIR;
-    fs.mkdirSync(extractDir, { recursive: true });
+			const extractDir = multiVersion ? path.join(OUTPUT_DIR, `R${version}`) : OUTPUT_DIR;
+			fs.mkdirSync(extractDir, { recursive: true });
+			clearPreviousSchemas(extractDir);
 
-    console.log(`  Extracting XSD files -> ${extractDir}`);
-    const { masterFiles, depFiles } = extractFromZip(tmpZip, extractDir);
-    fs.unlinkSync(tmpZip);
+			console.log(`  Extracting XSD files -> ${extractDir}`);
+			const { masterFiles, depFiles } = extractFromZip(tmpZip, extractDir);
 
-    if (masterFiles.length === 0) {
-      throw new Error(`No *Master.xsd files found in ${filename}`);
-    }
+			if (masterFiles.length === 0) {
+				throw new Error(`No *Master.xsd files found in ${filename}`);
+			}
 
-    console.log(`\t${masterFiles.length} Master XSD file(s):`);
-    masterFiles.sort().forEach((f) => console.log(`\t\t${f}`));
+			console.log(`\t${masterFiles.length} Master XSD file(s):`);
+			masterFiles.sort().forEach((f) => console.log(`\t\t${f}`));
 
-    if (depFiles.length > 0) {
-      console.log(`\t${depFiles.length} dependency file(s):`);
-      depFiles.sort().forEach((f) => console.log(`\t\t${f}`));
-    }
-  }
+			if (depFiles.length > 0) {
+				console.log(`\t${depFiles.length} dependency file(s):`);
+				depFiles.sort().forEach((f) => console.log(`\t\t${f}`));
+			}
+		}
+	} finally {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	}
 
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-
-  console.log("");
-  console.log(`\tDone. XSD files are in: ${OUTPUT_DIR}`);
+	console.log("");
+	console.log(`\tDone. XSD files are in: ${OUTPUT_DIR}`);
 }
 
 main().catch((err) => {
-  console.error("\nERROR:", err.message);
-  process.exit(1);
+	console.error("\nERROR:", err.message);
+	process.exit(1);
 });
