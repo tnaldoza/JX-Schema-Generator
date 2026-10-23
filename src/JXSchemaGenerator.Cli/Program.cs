@@ -1,7 +1,7 @@
-using JXSchemaGenerator.Schema;
 using JXSchemaGenerator.Emit;
-using JXSchemaGenerator.Generate;
 using JXSchemaGenerator.Expand;
+using JXSchemaGenerator.Generate;
+using JXSchemaGenerator.Schema;
 
 static string? GetArg(string[] args, string name)
 {
@@ -47,12 +47,13 @@ if (!Directory.Exists(inputFolder))
 
 var targets = rootXsd is not null
 	? [rootXsd]
-	: Directory.GetFiles(inputFolder, "*Master.xsd", SearchOption.TopDirectoryOnly)
-			   .Select(Path.GetFileName)
-			   .Where(f => f is not null)
-			   .Cast<string>()
-			   .OrderBy(f => f)
-			   .ToArray();
+	: Directory
+		.GetFiles(inputFolder, "*Master.xsd", SearchOption.TopDirectoryOnly)
+		.Select(Path.GetFileName)
+		.Where(f => f is not null)
+		.Cast<string>()
+		.OrderBy(f => f, StringComparer.Ordinal)
+		.ToArray();
 
 if (targets.Length == 0)
 {
@@ -64,8 +65,6 @@ Console.WriteLine($"Command      : {command}");
 Console.WriteLine($"Input folder : {Path.GetFullPath(inputFolder)}");
 Console.WriteLine($"Strict       : {strict}");
 Console.WriteLine($"Targets      : {targets.Length} file(s)");
-
-var loader = new SchemaLoader();
 
 var options = new ExpansionOptions
 {
@@ -83,7 +82,7 @@ if (command == "detect")
 		SchemaIndex index;
 		try
 		{
-			var result = loader.LoadAndCompileRoot(inputFolder, xsdFile, strict);
+			var result = SchemaLoader.LoadAndCompileRoot(inputFolder, xsdFile, strict);
 			index = SchemaIndex.Build(result.SchemaSet);
 		}
 		catch (Exception ex)
@@ -114,7 +113,7 @@ foreach (var xsdFile in targets)
 	SchemaIndex index;
 	try
 	{
-		var result = loader.LoadAndCompileRoot(inputFolder, xsdFile, strict);
+		var result = SchemaLoader.LoadAndCompileRoot(inputFolder, xsdFile, strict);
 		index = SchemaIndex.Build(result.SchemaSet);
 		Console.WriteLine(index.ToString());
 	}
@@ -143,11 +142,11 @@ foreach (var xsdFile in targets)
 		JsonEmitter.WriteToFile(modPath, modPayload);
 		Console.WriteLine($"Wrote: {modPath}");
 
-		CollectEmptyTagWarnings(xsdFile, modModel.entityTypes
-			.SelectMany(et => et.Value.modificationSections
-				.Where(s => s.schema is null)
-				.Select(s => $"[{et.Key}] {s.name}")),
-			warnings);
+		CollectEmptyTagWarnings(
+			xsdFile,
+			modModel.entityTypes.SelectMany(et => et.Value.modificationSections.Where(s => s.schema is null).Select(s => $"[{et.Key}] {s.name}")),
+			warnings
+		);
 
 		written++;
 		wroteAny = true;
@@ -156,7 +155,7 @@ foreach (var xsdFile in targets)
 	var addConfig = AddOpConfigs.FromRootXsd(xsdFile);
 	if (addConfig is not null)
 	{
-		var addModel = new AddGenerator().Generate(index, options);
+		var addModel = AddGenerator.Generate(index, options);
 
 		var addPayload = new Dictionary<string, object?>
 		{
@@ -176,7 +175,7 @@ foreach (var xsdFile in targets)
 	var searchConfig = SrchOpConfigs.FromRootXsd(xsdFile);
 	if (searchConfig is not null)
 	{
-		var searchModel = new SearchGenerator().Generate(index, options);
+		var searchModel = SearchGenerator.Generate(index, options);
 
 		var searchPayload = new Dictionary<string, object?>
 		{
@@ -196,7 +195,7 @@ foreach (var xsdFile in targets)
 	var InquiryConfig = InquiryConfigs.FromRootXsd(xsdFile);
 	if (InquiryConfig is not null)
 	{
-		var InquiryModel = new InquiryGenerator().Generate(index, options);
+		var InquiryModel = InquiryGenerator.Generate(index, options);
 
 		var InquiryPayload = new Dictionary<string, object?>
 		{
@@ -227,7 +226,8 @@ Console.WriteLine($"Files skipped : {skipped}");
 if (warnings.Count > 0)
 {
 	Console.WriteLine($"\nWARNING: {warnings.Count} section(s) resolved zero tags:");
-	foreach (var w in warnings) Console.WriteLine($"  {w}");
+	foreach (var w in warnings)
+		Console.WriteLine($"  {w}");
 }
 else
 {

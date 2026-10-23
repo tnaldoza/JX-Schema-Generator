@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using System.Xml;
-
 using JXSchemaGenerator.Expand;
 using JXSchemaGenerator.Generate.Models;
 using JXSchemaGenerator.Schema;
@@ -13,13 +12,12 @@ namespace JXSchemaGenerator.Generate;
 ///   requestSchema       - the filterable fields (SrchMsgRqHdr header stripped)
 ///   responseRecordSchema - the result record fields ({Name}Rec_CType convention)
 /// </summary>
-public sealed class SearchGenerator
+public static class SearchGenerator
 {
 	// Standard boilerplate header present in every search request - not a filter field
-	private static readonly HashSet<string> SkippedRqElements =
-		new(StringComparer.OrdinalIgnoreCase) { "SrchMsgRqHdr" };
+	private static readonly HashSet<string> SkippedRqElements = new(StringComparer.OrdinalIgnoreCase) { "SrchMsgRqHdr" };
 
-	public SearchElementsRoot Generate(SchemaIndex index, ExpansionOptions options)
+	public static SearchElementsRoot Generate(SchemaIndex index, ExpansionOptions options)
 	{
 		var expander = new TypeExpander(index, options);
 		var root = new SearchElementsRoot();
@@ -29,7 +27,8 @@ public sealed class SearchGenerator
 			var typeName = kvp.Key.Name;
 
 			// Only process *SrchRq_MType types
-			if (!typeName.EndsWith("SrchRq_MType", StringComparison.Ordinal)) continue;
+			if (!typeName.EndsWith("SrchRq_MType", StringComparison.Ordinal))
+				continue;
 
 			// Derive element name: XferSrchRq_MType -> XferSrch  (strip "Rq_MType")
 			var elementName = typeName[..^"Rq_MType".Length];
@@ -62,9 +61,7 @@ public sealed class SearchGenerator
 		}
 
 		// Sort alphabetically
-		root.searchOperations = root.searchOperations
-			.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
-			.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+		root.searchOperations = root.searchOperations.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
 		return root;
 	}

@@ -1,9 +1,8 @@
 using System.Xml;
 using System.Xml.Schema;
-
 using JXSchemaGenerator.Expand;
-using JXSchemaGenerator.Schema;
 using JXSchemaGenerator.Generate.Models;
+using JXSchemaGenerator.Schema;
 
 namespace JXSchemaGenerator.Generate;
 
@@ -22,8 +21,15 @@ public sealed class DomainDetector
 	// Infrastructure elements that appear in every Rq/Rs type - not domain content
 	private static readonly HashSet<string> InfraElements = new(StringComparer.OrdinalIgnoreCase)
 	{
-		"MsgRqHdr", "MsgRsHdr", "ErrOvrRdInfoArray", "AccountId", "Dlt",
-		"Custom", "ActIntentKey", "ActIntent", "RsStat",
+		"MsgRqHdr",
+		"MsgRsHdr",
+		"ErrOvrRdInfoArray",
+		"AccountId",
+		"Dlt",
+		"Custom",
+		"ActIntentKey",
+		"ActIntent",
+		"RsStat",
 	};
 
 	public DomainDetector(SchemaIndex index, string xsdFileName)
@@ -40,16 +46,14 @@ public sealed class DomainDetector
 
 		// Collect all *InqRs_MType response types that contain x_ extended elements
 		// (these correspond to the InquiryGenerator auto-discovered operations)
-		var inquiryContainers = FindContainersMatching(
-			name => name.EndsWith("InqRs_MType", StringComparison.OrdinalIgnoreCase),
-			requiresXChildren: true);
+		var inquiryContainers = FindContainersMatching(name => name.EndsWith("InqRs_MType", StringComparison.OrdinalIgnoreCase), requiresXChildren: true);
 
 		// Collect all *ModRq_MType that contain a *Mod_CType child with sections
 		var modContainers = FindContainersMatching(
-			name => name.EndsWith("ModRq_MType", StringComparison.OrdinalIgnoreCase)
-				 || name.EndsWith("AcctModRq_MType", StringComparison.OrdinalIgnoreCase),
+			name => name.EndsWith("ModRq_MType", StringComparison.OrdinalIgnoreCase) || name.EndsWith("AcctModRq_MType", StringComparison.OrdinalIgnoreCase),
 			requiresXChildren: false,
-			requiresModChild: true);
+			requiresModChild: true
+		);
 
 		// Inquiry analysis + validation
 		foreach (var c in inquiryContainers)
@@ -93,13 +97,15 @@ public sealed class DomainDetector
 			foreach (var sectionEl in c.ModSectionElements)
 			{
 				var v = ValidateElement(sectionEl, c.Namespace, isXElement: false);
-				entry.SectionValidations.Add(new ModSectionValidation
-				{
-					SectionName = v.ElementName,
-					Strategy = v.Strategy,
-					ResolvedTypeName = v.ResolvedTypeName,
-					TagCount = v.TagCount,
-				});
+				entry.SectionValidations.Add(
+					new ModSectionValidation
+					{
+						SectionName = v.ElementName,
+						Strategy = v.Strategy,
+						ResolvedTypeName = v.ResolvedTypeName,
+						TagCount = v.TagCount,
+					}
+				);
 			}
 		}
 
@@ -173,26 +179,23 @@ public sealed class DomainDetector
 		return v;
 	}
 
-	private List<ContainerResult> FindContainersMatching(
-		Func<string, bool> nameFilter,
-		bool requiresXChildren,
-		bool requiresModChild = false)
+	private List<ContainerResult> FindContainersMatching(Func<string, bool> nameFilter, bool requiresXChildren, bool requiresModChild = false)
 	{
 		var results = new List<ContainerResult>();
 
 		foreach (var kvp in _index.ComplexTypes)
 		{
 			var typeName = kvp.Key.Name;
-			if (!nameFilter(typeName)) continue;
+			if (!nameFilter(typeName))
+				continue;
 
 			var ct = kvp.Value;
 			var all = GetAllChildElements(ct);
 
-			var xChildren = all
-				.Where(e => (e.Name ?? "").StartsWith("x_", StringComparison.OrdinalIgnoreCase))
-				.ToList();
+			var xChildren = all.Where(e => (e.Name ?? "").StartsWith("x_", StringComparison.OrdinalIgnoreCase)).ToList();
 
-			if (requiresXChildren && xChildren.Count == 0) continue;
+			if (requiresXChildren && xChildren.Count == 0)
+				continue;
 
 			// For mod: find the *Mod child and its section elements
 			string? modStructure = null;
@@ -207,7 +210,7 @@ public sealed class DomainDetector
 					return !InfraElements.Contains(n)
 						&& !n.StartsWith("Ver_", StringComparison.OrdinalIgnoreCase)
 						&& n.EndsWith("Mod", StringComparison.OrdinalIgnoreCase)
-						&& (e.SchemaTypeName.Name.EndsWith("_CType") || e.ElementSchemaType is XmlSchemaComplexType);
+						&& (e.SchemaTypeName.Name.EndsWith("_CType", StringComparison.Ordinal) || e.ElementSchemaType is XmlSchemaComplexType);
 				});
 
 				if (modEl is not null)
@@ -215,7 +218,8 @@ public sealed class DomainDetector
 					// Nested: use the *Mod_CType's children as sections
 					modStructure = modEl.Name;
 					var modCt = ResolveType(modEl, kvp.Key.Namespace);
-					if (modCt is null) continue;
+					if (modCt is null)
+						continue;
 
 					modSectionElements = GetAllChildElements(modCt)
 						.Where(e =>
@@ -232,14 +236,17 @@ public sealed class DomainDetector
 				{
 					// Flat pattern: sections are direct non-infra children (e.g. CustModRq -> CustDetail, RegDetail)
 					modStructure = "";
-					modSectionElements = all
-						.Where(e =>
+					modSectionElements = all.Where(e =>
 						{
 							var n = e.Name ?? "";
-							if (InfraElements.Contains(n)) return false;
-							if (n.StartsWith("Ver_", StringComparison.OrdinalIgnoreCase)) return false;
-							if (string.Equals(n, "Custom", StringComparison.OrdinalIgnoreCase)) return false;
-							if (string.IsNullOrEmpty(n)) return false;
+							if (InfraElements.Contains(n))
+								return false;
+							if (n.StartsWith("Ver_", StringComparison.OrdinalIgnoreCase))
+								return false;
+							if (string.Equals(n, "Custom", StringComparison.OrdinalIgnoreCase))
+								return false;
+							if (string.IsNullOrEmpty(n))
+								return false;
 							// Skip identifier/scalar elements (no child elements in their type)
 							var ct = ResolveType(e, kvp.Key.Namespace);
 							return ct is not null && GetAllChildElements(ct).Count > 0;
@@ -247,17 +254,20 @@ public sealed class DomainDetector
 						.ToList();
 				}
 
-				if (modSectionElements.Count == 0) continue;
+				if (modSectionElements.Count == 0)
+					continue;
 			}
 
-			results.Add(new ContainerResult
-			{
-				ContainerName = typeName,
-				Namespace = kvp.Key.Namespace,
-				XChildren = xChildren,
-				ModStructureName = modStructure,
-				ModSectionElements = modSectionElements,
-			});
+			results.Add(
+				new ContainerResult
+				{
+					ContainerName = typeName,
+					Namespace = kvp.Key.Namespace,
+					XChildren = xChildren,
+					ModStructureName = modStructure,
+					ModSectionElements = modSectionElements,
+				}
+			);
 		}
 
 		return results;
@@ -265,19 +275,23 @@ public sealed class DomainDetector
 
 	private XmlSchemaComplexType? ResolveType(XmlSchemaElement el, string ns)
 	{
-		if (el.ElementSchemaType is XmlSchemaComplexType direct) return direct;
+		if (el.ElementSchemaType is XmlSchemaComplexType direct)
+			return direct;
 
 		var tn = el.SchemaTypeName;
 		if (!tn.IsEmpty)
 		{
-			if (string.IsNullOrEmpty(tn.Namespace)) tn = new XmlQualifiedName(tn.Name, ns);
-			if (_index.ComplexTypes.TryGetValue(tn, out var ct)) return ct;
+			if (string.IsNullOrEmpty(tn.Namespace))
+				tn = new XmlQualifiedName(tn.Name, ns);
+			if (_index.ComplexTypes.TryGetValue(tn, out var ct))
+				return ct;
 		}
 
 		foreach (var suffix in new[] { "_CType", "_AType" })
 		{
 			var q = new XmlQualifiedName((el.Name ?? "") + suffix, ns);
-			if (_index.ComplexTypes.TryGetValue(q, out var ct2)) return ct2;
+			if (_index.ComplexTypes.TryGetValue(q, out var ct2))
+				return ct2;
 		}
 
 		return null;
@@ -289,25 +303,50 @@ public sealed class DomainDetector
 
 		void WalkParticle(XmlSchemaParticle? p)
 		{
-			if (p is null) return;
+			if (p is null)
+				return;
 			switch (p)
 			{
-				case XmlSchemaSequence seq: foreach (var i in seq.Items) WalkObject(i); break;
-				case XmlSchemaChoice choice: foreach (var i in choice.Items) WalkObject(i); break;
-				case XmlSchemaAll all: foreach (var i in all.Items) WalkObject(i); break;
+				case XmlSchemaSequence seq:
+					foreach (var i in seq.Items)
+						WalkObject(i);
+					break;
+				case XmlSchemaChoice choice:
+					foreach (var i in choice.Items)
+						WalkObject(i);
+					break;
+				case XmlSchemaAll all:
+					foreach (var i in all.Items)
+						WalkObject(i);
+					break;
 			}
 		}
 
 		void WalkObject(XmlSchemaObject obj)
 		{
-			if (obj is XmlSchemaElement el) { list.Add(el); return; }
-			if (obj is XmlSchemaSequence s) { WalkParticle(s); return; }
-			if (obj is XmlSchemaChoice c) { WalkParticle(c); return; }
-			if (obj is XmlSchemaAll a) { WalkParticle(a); return; }
+			if (obj is XmlSchemaElement el)
+			{
+				list.Add(el);
+				return;
+			}
+			if (obj is XmlSchemaSequence s)
+			{
+				WalkParticle(s);
+				return;
+			}
+			if (obj is XmlSchemaChoice c)
+			{
+				WalkParticle(c);
+				return;
+			}
+			if (obj is XmlSchemaAll a)
+			{
+				WalkParticle(a);
+				return;
+			}
 		}
 
-		if (ct.ContentModel is XmlSchemaComplexContent cc &&
-			cc.Content is XmlSchemaComplexContentExtension ext)
+		if (ct.ContentModel is XmlSchemaComplexContent cc && cc.Content is XmlSchemaComplexContentExtension ext)
 			WalkParticle(ext.Particle);
 		else
 			WalkParticle(ct.Particle);

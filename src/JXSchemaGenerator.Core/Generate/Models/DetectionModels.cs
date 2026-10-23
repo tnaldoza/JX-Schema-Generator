@@ -4,18 +4,18 @@ namespace JXSchemaGenerator.Generate.Models;
 
 public enum ContainerPattern
 {
-	MultiAcctInqRec,    // e.g. DepAcctInqRec_CType
-	SingleInqRs,        // e.g. CustInqRs_MType
-	MultiAcctModRq,     // e.g. DepAcctModRq_MType
-	SingleModRq,        // e.g. CustModRq_MType
+	MultiAcctInqRec, // e.g. DepAcctInqRec_CType
+	SingleInqRs, // e.g. CustInqRs_MType
+	MultiAcctModRq, // e.g. DepAcctModRq_MType
+	SingleModRq, // e.g. CustModRq_MType
 }
 
 public enum TagResolutionStrategy
 {
-	None = 0,           // all strategies failed - tags will be empty
-	DirectType = 1,     // ElementSchemaType.QualifiedName (compiler resolved)
+	None = 0, // all strategies failed - tags will be empty
+	DirectType = 1, // ElementSchemaType.QualifiedName (compiler resolved)
 	SchemaTypeName = 2, // SchemaTypeName attribute (explicit type ref)
-	Convention = 3,     // JXChange naming convention: Foo_CType / Foo_AType
+	Convention = 3, // JXChange naming convention: Foo_CType / Foo_AType
 }
 
 public sealed class ContainerResult

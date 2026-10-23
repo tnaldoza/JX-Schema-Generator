@@ -1,3 +1,4 @@
+using System.Globalization;
 using JXSchemaGenerator.Generate.Models;
 
 namespace JXSchemaGenerator.Generate;
@@ -45,7 +46,7 @@ public static class DetectionReportPrinter
 			// Validation results per x_ element
 			Console.WriteLine("  x_ element validation (real tag counts from expansion pipeline):");
 			Console.WriteLine();
-			Console.WriteLine($"    {"Element",-42} {"Strategy",-14} {"Type Resolved",-36} Tags");
+			Console.WriteLine($"    {"Element", -42} {"Strategy", -14} {"Type Resolved", -36} Tags");
 			Console.WriteLine($"    {new string('-', 42)} {new string('-', 14)} {new string('-', 36)} ----");
 
 			foreach (var entry in report.Inquiry.Values)
@@ -61,8 +62,8 @@ public static class DetectionReportPrinter
 						_ => "NONE",
 					};
 					var resolved = v.ResolvedTypeName ?? "(not resolved)";
-					var tags = v.IsEmpty ? "EMPTY" : v.TagCount.ToString();
-					Console.WriteLine($"  {icon} {v.ElementName,-42} {strat,-14} {resolved,-36} {tags}");
+					var tags = v.IsEmpty ? "EMPTY" : v.TagCount.ToString(CultureInfo.InvariantCulture);
+					Console.WriteLine($"  {icon} {v.ElementName, -42} {strat, -14} {resolved, -36} {tags}");
 				}
 			}
 
@@ -82,13 +83,9 @@ public static class DetectionReportPrinter
 			Console.WriteLine("  MODIFICATION CONFIG  ->  add to ModificationDomainConfig.cs");
 			Console.WriteLine("  --------------------------------------------------------------------");
 
-			var multiMod = report.Modification.Values
-				.Where(e => e.Pattern == ContainerPattern.MultiAcctModRq)
-				.ToList();
+			var multiMod = report.Modification.Values.Where(e => e.Pattern == ContainerPattern.MultiAcctModRq).ToList();
 
-			var singleMod = report.Modification.Values
-				.Where(e => e.Pattern == ContainerPattern.SingleModRq)
-				.ToList();
+			var singleMod = report.Modification.Values.Where(e => e.Pattern == ContainerPattern.SingleModRq).ToList();
 
 			if (multiMod.Count > 0)
 			{
@@ -100,7 +97,9 @@ public static class DetectionReportPrinter
 				Console.WriteLine("    {");
 				Console.WriteLine($"        OutputFileName     = \"<name>ModificationElements.json\",");
 				Console.WriteLine($"        ContainerTypeRegex = new Regex(@\"^(?<key>[A-Za-z]+)AcctModRq_MType$\", RegexOptions.Compiled),");
-				Console.WriteLine($"        OutputOrder        = [{string.Join(", ", multiMod.Select(e => $"\"{SuggestKey(e.DetectedPrefix, e.Pattern)}\""))}],");
+				Console.WriteLine(
+					$"        OutputOrder        = [{string.Join(", ", multiMod.Select(e => $"\"{SuggestKey(e.DetectedPrefix, e.Pattern)}\""))}],"
+				);
 				Console.WriteLine($"        TypeToEntry        = key => key switch");
 				Console.WriteLine("        {");
 				foreach (var e in multiMod)
@@ -137,7 +136,7 @@ public static class DetectionReportPrinter
 			Console.WriteLine();
 			Console.WriteLine("  Modification section validation (real tag counts from expansion pipeline):");
 			Console.WriteLine();
-			Console.WriteLine($"    {"Section",-36} {"Structure",-24} {"Strategy",-14} {"Type Resolved",-36} Tags");
+			Console.WriteLine($"    {"Section", -36} {"Structure", -24} {"Strategy", -14} {"Type Resolved", -36} Tags");
 			Console.WriteLine($"    {new string('-', 36)} {new string('-', 24)} {new string('-', 14)} {new string('-', 36)} ----");
 
 			foreach (var entry in report.Modification.Values)
@@ -154,8 +153,8 @@ public static class DetectionReportPrinter
 						_ => "NONE",
 					};
 					var resolved = sv.ResolvedTypeName ?? "(not resolved)";
-					var tags = sv.IsEmpty ? "EMPTY" : sv.TagCount.ToString();
-					Console.WriteLine($"  {icon} {sv.SectionName,-36} {structure,-24} {strat,-14} {resolved,-36} {tags}");
+					var tags = sv.IsEmpty ? "EMPTY" : sv.TagCount.ToString(CultureInfo.InvariantCulture);
+					Console.WriteLine($"  {icon} {sv.SectionName, -36} {structure, -24} {strat, -14} {resolved, -36} {tags}");
 				}
 			}
 
@@ -165,15 +164,9 @@ public static class DetectionReportPrinter
 		}
 
 		// EDGE CASES
-		var emptyXElements = report.Inquiry.Values
-			.SelectMany(e => e.Validations)
-			.Where(v => v.IsEmpty)
-			.ToList();
+		var emptyXElements = report.Inquiry.Values.SelectMany(e => e.Validations).Where(v => v.IsEmpty).ToList();
 
-		var emptySections = report.Modification.Values
-			.SelectMany(e => e.SectionValidations)
-			.Where(v => v.IsEmpty)
-			.ToList();
+		var emptySections = report.Modification.Values.SelectMany(e => e.SectionValidations).Where(v => v.IsEmpty).ToList();
 
 		if (emptyXElements.Count > 0 || emptySections.Count > 0)
 		{
@@ -221,26 +214,28 @@ public static class DetectionReportPrinter
 		Console.WriteLine();
 	}
 
-	private static string SuggestKey(string prefix, ContainerPattern pattern) => prefix switch
-	{
-		"Dep" => "D",
-		"TimeDep" => "T",
-		"Ln" => "L",
-		"SafeDep" => "B",
-		"Trck" => "C",
-		"Cust" => "Cust",
-		_ => prefix,
-	};
+	private static string SuggestKey(string prefix, ContainerPattern pattern) =>
+		prefix switch
+		{
+			"Dep" => "D",
+			"TimeDep" => "T",
+			"Ln" => "L",
+			"SafeDep" => "B",
+			"Trck" => "C",
+			"Cust" => "Cust",
+			_ => prefix,
+		};
 
-	private static string SuggestDisplayName(string prefix) => prefix switch
-	{
-		"Dep" => "Deposit/Checking/Savings",
-		"TimeDep" => "Time Deposit/CD",
-		"Ln" => "Loan",
-		"SafeDep" => "Safe Deposit Box",
-		"Trck" => "Collection/Trust",
-		"Cust" => "Customer",
-		"DocElecRcpt" => "Document Electronic Receipt",
-		_ => prefix,
-	};
+	private static string SuggestDisplayName(string prefix) =>
+		prefix switch
+		{
+			"Dep" => "Deposit/Checking/Savings",
+			"TimeDep" => "Time Deposit/CD",
+			"Ln" => "Loan",
+			"SafeDep" => "Safe Deposit Box",
+			"Trck" => "Collection/Trust",
+			"Cust" => "Customer",
+			"DocElecRcpt" => "Document Electronic Receipt",
+			_ => prefix,
+		};
 }
