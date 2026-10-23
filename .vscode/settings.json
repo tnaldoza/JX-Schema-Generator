@@ -1,58 +1,43 @@
 {
-  // Format on save
-  "editor.formatOnSave": true,
-  "editor.formatOnPaste": true,
+	"editor.formatOnSave": true,
+	"editor.detectIndentation": false,
+	"editor.renderWhitespace": "boundary",
+	"editor.rulers": [160],
+	"files.trimTrailingWhitespace": true,
+	"files.insertFinalNewline": true,
+	"files.eol": "\n",
 
-  // C# / OmniSharp / Roslyn
-  "[csharp]": {
-    "editor.defaultFormatter": "ms-dotnettools.csharp",
-    "editor.formatOnSave": true,
-    "editor.formatOnType": true
-  },
+	"[csharp]": {
+		"editor.defaultFormatter": "csharpier.csharpier-vscode"
+	},
+	"[xml]": {
+		"editor.defaultFormatter": "csharpier.csharpier-vscode"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[yaml]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[javascript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[markdown]": {
+		"editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+	},
 
-  // JSON
-  "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features",
-    "editor.formatOnSave": true
-  },
-  "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features",
-    "editor.formatOnSave": true
-  },
+	"dotnet.enableEditorConfigSupport": true,
 
-  // XML / project files
-  "[xml]": {
-    "editor.formatOnSave": true
-  },
-
-  // YAML
-  "[yaml]": {
-    "editor.formatOnSave": true
-  },
-
-  // Trim trailing whitespace and final newline (mirrors .editorconfig)
-  "files.trimTrailingWhitespace": true,
-  "files.insertFinalNewline": true,
-
-  // Use .editorconfig for indent/spacing preferences
-  "editor.detectIndentation": false,
-
-  // Show whitespace so you can see tabs vs spaces
-  "editor.renderWhitespace": "boundary",
-
-  // Roslyn / C# analyzer settings
-  "dotnet.enableEditorConfigSupport": true,
-  "csharp.format.enable": true,
-
-  // File associations
-  "files.associations": {
-    "*.csproj": "xml",
-    "*.props": "xml",
-    "*.targets": "xml",
-    "*.slnx": "xml",
-    "*.nuspec": "xml"
-  },
-
-  // Ruler at max line length from .editorconfig
-  "editor.rulers": [160]
+	"files.associations": {
+		"*.csproj": "xml",
+		"*.props": "xml",
+		"*.targets": "xml",
+		"*.slnx": "xml"
+	}
 }

@@ -1,21 +1,41 @@
 {
-  "name": "jx-schema-generator",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Fetches Jack Henry jXchange TPG XSDs and generates JSON schemas.",
-  "license": "UNLICENSED",
-  "engines": {
-    "node": ">=24"
-  },
-  "scripts": {
-    "fetch:xsd": "node scripts/fetch-xsd.js",
-    "fetch:xsd:all": "node scripts/fetch-xsd.js --all",
-    "fetch:xsd:version": "node scripts/fetch-xsd.js --version",
-    "clean": "node -e \"require('fs').rmSync('dist', { recursive:true, force:true })\"",
-    "generate": "dotnet run --project src/JXSchemaGenerator.Cli -- generate --input schemas --out dist/schemas",
-    "detect": "dotnet run --project src/JXSchemaGenerator.Cli -- detect --input schemas",
-    "build": "npm run generate"
-  },
-  "dependencies": {},
-  "devDependencies": {}
+	"name": "jx-schema-generator",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Fetches Jack Henry jXchange TPG XSDs and generates JSON element mappings",
+	"license": "UNLICENSED",
+	"devEngines": {
+		"runtime": {
+			"name": "node",
+			"version": "^26.12.0",
+			"onFail": "download"
+		},
+		"packageManager": {
+			"name": "pnpm",
+			"version": "^12.14.0",
+			"onFail": "download"
+		}
+	},
+	"scripts": {
+		"fetch:xsd": "node scripts/fetch-xsd.js",
+		"fetch:xsd:all": "node scripts/fetch-xsd.js --all",
+		"fetch:xsd:version": "node scripts/fetch-xsd.js --version",
+		"generate": "dotnet run --project src/JXSchemaGenerator.Cli -c Release -- generate --input schemas --out dist/schemas",
+		"detect": "dotnet run --project src/JXSchemaGenerator.Cli -c Release -- detect --input schemas",
+		"build": "pnpm run generate",
+		"clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+		"test": "dotnet test --solution JXSchemaGenerator.slnx",
+		"format": "prettier --write . && dotnet csharpier format .",
+		"format:check": "prettier --check . && dotnet csharpier check .",
+		"lint:md": "markdownlint-cli2",
+		"lint": "prettier --check . && markdownlint-cli2"
+	},
+	"devDependencies": {
+		"@commitlint/cli": "21.2.4",
+		"@commitlint/config-conventional": "21.2.4",
+		"@commitlint/types": "21.2.3",
+		"lefthook": "2.2.1",
+		"markdownlint-cli2": "0.24.0",
+		"prettier": "3.9.10"
+	}
 }

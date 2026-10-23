@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://www.schemastore.org/pnpm-workspace.json
+saveExact: true
+engineStrict: true
+pmOnFail: download
+
+minimumReleaseAge: 1440
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+
+allowBuilds:
+  lefthook: true

@@ -1,0 +1,13 @@
+node_modules/
+**/bin/
+**/obj/
+artifacts/
+dist/
+coverage/
+test-results/
+schemas/
+.tmp-fetch-xsd/
+pnpm-lock.yaml
+
+# ! Markdown belongs to markdownlint-cli2, C# and MSBuild files to CSharpier
+*.md
