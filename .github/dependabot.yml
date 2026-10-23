@@ -26,6 +26,11 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 14
+    ignore:
+      # ! Published without provenance, which pnpm's trustPolicy rejects as a possible takeover
+      # https://github.com/evilmartians/lefthook/issues/1607
+      - dependency-name: lefthook
+        versions: ["2.2.2"]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
