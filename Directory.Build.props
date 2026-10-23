@@ -1,0 +1,42 @@
+<Project>
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<IsPackable>false</IsPackable>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<!-- ! IDE0005 only reports on build when documentation generation is on -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);CS1591</NoWarn>
+		<WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+		<!-- ! Only takes effect in projects that emit runtimeconfig.json (Cli, Tests), never in Core -->
+		<XmlResolverIsNetworkingEnabledByDefault>false</XmlResolverIsNetworkingEnabledByDefault>
+		<NuGetAudit>true</NuGetAudit>
+		<NuGetAuditMode>all</NuGetAuditMode>
+		<NuGetAuditLevel>low</NuGetAuditLevel>
+		<!-- ! Explicit false makes a fresh restore fail with NU1005 when a packages.lock.json exists -->
+		<RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+		<!-- ? Inert on 10.0 SDKs; reports NETSDK1238-1240 once the repository builds with an 11.0 SDK -->
+		<CheckSdkVulnerabilities>true</CheckSdkVulnerabilities>
+		<NuGetAuditCodes>NU1900;NU1901;NU1902;NU1903;NU1904;NU1905</NuGetAuditCodes>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<!-- ! SDK advisory and end-of-life notices must stay visible without failing unrelated builds -->
+		<WarningsNotAsErrors>$(WarningsNotAsErrors);NETSDK1238;NETSDK1239;NETSDK1240</WarningsNotAsErrors>
+	</PropertyGroup>
+
+	<!-- * Advisories fail only the dedicated audit job, so a new advisory never blocks unrelated work -->
+	<!-- See: https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#running-nuget-audit-in-ci -->
+	<PropertyGroup Condition="'$(NuGetAuditGate)' == 'true'">
+		<WarningsAsErrors>$(WarningsAsErrors);$(NuGetAuditCodes)</WarningsAsErrors>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(NuGetAuditGate)' != 'true'">
+		<WarningsNotAsErrors>$(WarningsNotAsErrors);$(NuGetAuditCodes)</WarningsNotAsErrors>
+	</PropertyGroup>
+</Project>

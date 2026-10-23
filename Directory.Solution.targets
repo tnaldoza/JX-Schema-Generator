@@ -1,0 +1,14 @@
+<Project>
+	<!-- ! Restore runs at solution level, so this check cannot live in Directory.Build.props -->
+	<!-- See: https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#ensure-restore-audited-projects -->
+	<Target
+		Name="AssertRestoreAuditedEveryProject"
+		AfterTargets="Restore"
+		Condition="'$(CI)' == 'true'"
+	>
+		<Error
+			Condition="'$(RestoreProjectCount)' != '$([MSBuild]::Add($(RestoreProjectsAuditedCount), $(RestoreSkippedCount)))'"
+			Text="Restore did not audit every project in the solution. Expected: $(RestoreProjectCount) Audited: $(RestoreProjectsAuditedCount) Skipped: $(RestoreSkippedCount)"
+		/>
+	</Target>
+</Project>
