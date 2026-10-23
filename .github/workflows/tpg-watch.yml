@@ -1,0 +1,48 @@
+name: TPG watch
+
+# ! Jack Henry lists only the two newest TPG zips and deletes superseded ones within weeks
+on:
+  schedule:
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  watch:
+    name: Check for a new TPG XSD release
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write # open a tracking issue for an unreleased TPG version
+    steps:
+      - name: Compare listed TPG versions with releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          page="$(curl -fsSL --retry 3 https://jackhenry.dev/jxchange-soap/documentation/)"
+          # ! Two release trains are listed at once, so only a version sort finds the newest
+          # ! grep exits 1 on no match, which pipefail would turn into a silent failure before the check below
+          latest="$({ grep -oE 'TPG_R[0-9]{4}\.[0-9]+\.[0-9]{2}_XSD\.zip' <<<"$page" || true; } | sed -E 's/^TPG_R(.*)_XSD\.zip$/\1/' | sort -uV | tail -n 1)"
+          if [[ -z "$latest" ]]; then
+              echo "::error::No TPG zip links found on the Downloads page"
+              exit 1
+          fi
+          if gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -q "^tpg-${latest}-"; then
+              echo "TPG ${latest} already released"
+              exit 0
+          fi
+          title="TPG ${latest} is available"
+          if [[ "$(gh issue list --state open --search "in:title \"${title}\"" --json number --jq 'length')" == "0" ]]; then
+              gh issue create --title "$title" --body "Jack Henry lists TPG_R${latest}_XSD.zip on https://jackhenry.dev/jxchange-soap/documentation/ and deletes superseded zips within weeks. Run the Release workflow before it disappears."
+          fi
