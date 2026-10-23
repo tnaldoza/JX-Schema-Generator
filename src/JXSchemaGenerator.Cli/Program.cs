@@ -21,7 +21,7 @@ if (command is not "generate" and not "detect")
 	Console.WriteLine("  detect   --input <SchemaFolder> [--root <XsdFile>] [--strict true|false]");
 	Console.WriteLine();
 	Console.WriteLine("  generate  Process master XSD(s) and write JSON element mapping files.");
-	Console.WriteLine("  detect    Analyse master XSD(s) and print config recommendations with");
+	Console.WriteLine("  detect    Analyze master XSD(s) and print config recommendations with");
 	Console.WriteLine("            exact tag counts from the real expansion pipeline.");
 	Console.WriteLine();
 	Console.WriteLine("  --root is optional for both commands. Omit to process all *Master.xsd files.");
@@ -30,7 +30,7 @@ if (command is not "generate" and not "detect")
 
 var inputFolder = GetArg(args, "--input");
 var rootXsd = GetArg(args, "--root");
-var output = GetArg(args, "--out") ?? ".\\artifacts";
+var output = GetArg(args, "--out") ?? "artifacts";
 var strict = bool.TryParse(GetArg(args, "--strict"), out var s) ? s : true;
 
 if (string.IsNullOrWhiteSpace(inputFolder))
@@ -76,6 +76,7 @@ var options = new ExpansionOptions
 // DETECT
 if (command == "detect")
 {
+	int detectFailed = 0;
 	foreach (var xsdFile in targets)
 	{
 		Console.WriteLine($"\nLoading: {xsdFile}");
@@ -87,7 +88,8 @@ if (command == "detect")
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"  SKIPPED: {ex.Message}");
+			Console.WriteLine($"  FAILED: {ex.Message}");
+			detectFailed++;
 			continue;
 		}
 
@@ -95,7 +97,7 @@ if (command == "detect")
 		DetectionReportPrinter.Print(report);
 	}
 
-	return 0;
+	return detectFailed > 0 ? 1 : 0;
 }
 
 // GENERATE
@@ -104,6 +106,7 @@ Console.WriteLine($"Output       : {Path.GetFullPath(output)}");
 
 int written = 0;
 int skipped = 0;
+int failed = 0;
 var warnings = new List<string>();
 
 foreach (var xsdFile in targets)
@@ -119,8 +122,8 @@ foreach (var xsdFile in targets)
 	}
 	catch (Exception ex)
 	{
-		Console.WriteLine($"SKIPPED: {ex.Message}");
-		skipped++;
+		Console.WriteLine($"FAILED: {ex.Message}");
+		failed++;
 		continue;
 	}
 
@@ -222,6 +225,7 @@ foreach (var xsdFile in targets)
 Console.WriteLine("\n=== Summary ===");
 Console.WriteLine($"Files written : {written}");
 Console.WriteLine($"Files skipped : {skipped}");
+Console.WriteLine($"Files failed  : {failed}");
 
 if (warnings.Count > 0)
 {
@@ -234,7 +238,8 @@ else
 	Console.WriteLine("All sections resolved tags successfully.");
 }
 
-return 0;
+// ! A Master XSD that fails to compile fails the run, so a release never ships an incomplete bundle
+return failed > 0 ? 1 : 0;
 
 static void CollectEmptyTagWarnings(string xsdFile, IEnumerable<string> items, List<string> sink)
 {
