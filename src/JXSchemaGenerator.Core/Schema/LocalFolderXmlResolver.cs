@@ -1,68 +1,56 @@
-using System;
-using System.IO;
-using System.Net;
 using System.Xml;
 
 namespace JXSchemaGenerator.Schema;
 
+/// <summary>
+/// Resolves schema includes, imports and DTD references by file name inside one flat folder
+/// </summary>
+/// <remarks>
+/// ! Never opens a network URI or a file outside the folder, whatever a schemaLocation says
+/// The TPG zip ships every dependency schema next to the Master XSDs, so a missing file is a fetch problem, not a reason to go online
+/// </remarks>
 public sealed class LocalFolderXmlResolver : XmlResolver
 {
+	private static readonly StringComparison PathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
 	private readonly string _baseFolder;
-	private readonly XmlUrlResolver _httpFallback = new();
 
 	public LocalFolderXmlResolver(string baseFolder)
 	{
-		_baseFolder = Path.GetFullPath(baseFolder);
-	}
-
-	public override ICredentials? Credentials
-	{
-		set
-		{
-			_httpFallback.Credentials = value;
-		}
+		_baseFolder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baseFolder));
 	}
 
 	public override Uri ResolveUri(Uri? baseUri, string? relativeUri)
 	{
-		// Keep default behavior first
 		var resolved = base.ResolveUri(baseUri, relativeUri);
-
-		// If it already resolves to an existing local file, great
-		if (resolved.IsFile && File.Exists(resolved.LocalPath))
+		if (resolved.IsFile && IsInBaseFolder(resolved.LocalPath))
 			return resolved;
 
-		// Otherwise, map by filename into the base folder
-		if (!string.IsNullOrWhiteSpace(relativeUri))
-		{
-			var fileName = Path.GetFileName(relativeUri);
-			var candidate = Path.Combine(_baseFolder, fileName);
-			if (File.Exists(candidate))
-				return new Uri(Path.GetFullPath(candidate));
-		}
-
-		return resolved;
+		var candidate = MapIntoBaseFolder(relativeUri ?? resolved.OriginalString);
+		return candidate is null ? resolved : new Uri(candidate);
 	}
 
 	public override object? GetEntity(Uri absoluteUri, string? role, Type? ofObjectToReturn)
 	{
-		// 1. Prefer exact local file match
-		if (absoluteUri.IsFile && File.Exists(absoluteUri.LocalPath))
-			return File.OpenRead(absoluteUri.LocalPath);
+		if (ofObjectToReturn is not null && ofObjectToReturn != typeof(Stream) && ofObjectToReturn != typeof(object))
+			throw new XmlException($"Unsupported entity type {ofObjectToReturn} for {absoluteUri}");
 
-		// 2. Try the filename under the base folder (handles relative imports)
-		var fileName = Path.GetFileName(absoluteUri.OriginalString);
-		var candidate = Path.Combine(_baseFolder, fileName);
-		if (File.Exists(candidate))
-			return File.OpenRead(candidate);
+		var path = absoluteUri.IsFile && IsInBaseFolder(absoluteUri.LocalPath) ? absoluteUri.LocalPath : MapIntoBaseFolder(absoluteUri.OriginalString);
+		if (path is null || !File.Exists(path))
+			throw new FileNotFoundException($"Schema resource is not in {_baseFolder}: {absoluteUri}");
 
-		// 3. For external HTTP(S) URIs (e.g. OASIS WS-Security schemas that JXChange
-		//    XSDs import via schemaLocation), fall back to a standard URL resolver
-		//    rather than throwing. These are infrastructure schemas for SOAP headers
-		//    and are not available locally, but .NET's XmlUrlResolver can fetch them.
-		if (absoluteUri.Scheme is "http" or "https")
-			return _httpFallback.GetEntity(absoluteUri, role, ofObjectToReturn);
-
-		throw new FileNotFoundException($"Could not resolve schema resource: {absoluteUri}");
+		return File.OpenRead(path);
 	}
+
+	private string? MapIntoBaseFolder(string uriOrPath)
+	{
+		var fileName = Path.GetFileName(uriOrPath.Replace('\\', '/'));
+		if (string.IsNullOrEmpty(fileName))
+			return null;
+
+		var candidate = Path.Combine(_baseFolder, fileName);
+		return IsInBaseFolder(candidate) && File.Exists(candidate) ? Path.GetFullPath(candidate) : null;
+	}
+
+	private bool IsInBaseFolder(string path) => string.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), _baseFolder, PathComparison);
 }
