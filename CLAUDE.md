@@ -17,9 +17,9 @@ pnpm lint                                      # Prettier check + markdownlint
 
 ## Layout
 
-- `src/JXSchemaGenerator.Core` - schema loading (`Schema/`), type expansion (`Expand/`), per-verb generators and configs (`Generate/`), JSON output (`Emit/`)
-- `src/JXSchemaGenerator.Cli` - `generate` and `detect` commands, assembly name `generate`
-- `tests/JXSchemaGenerator.Tests` - xUnit v3 test executable
+- `src/JXSchemaGenerator.Core` - schema loading (`Schema/`), the document model (`Model/`), builders (`Build/`), JSON output (`Emit/`)
+- `src/JXSchemaGenerator.Cli` - the `generate` command only, assembly name `generate`
+- `tests/JXSchemaGenerator.Tests` - xUnit v3 test executable; `Fixtures/` holds a hand-written sample Master and its golden output
 - `scripts/fetch-xsd.js` - CommonJS fetcher using Node built-ins only
 
 ## Rules
@@ -32,3 +32,5 @@ pnpm lint                                      # Prettier check + markdownlint
 - CSharpier formats C# and MSBuild files, Prettier formats JSON, YAML and JS, markdownlint-cli2 owns Markdown
 - Never commit Jack Henry XSDs, WSDLs, zips, PDFs or DOCX files, and never copy text from the confidential Contract Changes document into the repository
 - Generated JSON key order uses ordinal comparers so output is stable across machines
+- Operations, modify containers, x_ elements and search records come from XSD structure; no source file lists operation, container or Master names
+- sample.golden.json changes only with a deliberate format change, and formatVersion goes up with any breaking one
