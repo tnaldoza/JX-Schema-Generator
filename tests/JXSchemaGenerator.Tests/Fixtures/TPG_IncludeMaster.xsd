@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="urn:jxschemagenerator:include" targetNamespace="urn:jxschemagenerator:include" elementFormDefault="qualified" version="2099.0.02">
+	<xsd:include schemaLocation="IncludedOperations.xsd" />
+	<xsd:complexType name="Memo_Type">
+		<xsd:simpleContent><xsd:extension base="xsd:string" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:element name="MemoInq" type="MemoInqRq_MType" />
+	<xsd:complexType name="MemoInqRq_MType">
+		<xsd:sequence><xsd:element name="MemoId" type="xsd:string" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="MemoInqResponse" type="MemoInqRs_MType" />
+	<xsd:complexType name="MemoInqRs_MType">
+		<xsd:sequence><xsd:element name="Memo" type="Memo_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+</xsd:schema>

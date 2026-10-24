@@ -1,0 +1,1228 @@
+{
+  "$schema": "./jxchange-schemas.schema.json",
+  "formatVersion": 2,
+  "tpgVersion": "2099.0.01",
+  "master": "TPG_SampleMaster.xsd",
+  "operations": {
+    "AcctAdd": {
+      "kind": "add",
+      "requestElement": "AcctAdd",
+      "responseElement": "AcctAddResponse",
+      "annotation": {
+        "description": "Opens an account"
+      },
+      "request": {
+        "InAcctId": {
+          "$typeName": "AccountId_CType",
+          "$required": true,
+          "AcctId": {
+            "$type": "string",
+            "$typeName": "AcctId_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          },
+          "AcctType": {
+            "$type": "string",
+            "$typeName": "AcctType_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          }
+        },
+        "ExtRec": {
+          "$typeName": "ExtRec_CType",
+          "$required": true,
+          "AcctId": {
+            "$type": "string",
+            "$typeName": "AcctId_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          },
+          "Bal": {
+            "$type": "decimal",
+            "$typeName": "Amt_Type",
+            "$attrs": [
+              "JHANull"
+            ]
+          }
+        },
+        "EmailArray": {
+          "$typeName": "EmailArray_AType",
+          "EmailInfo": {
+            "$typeName": "EmailInfo_CType",
+            "$required": true,
+            "$array": true,
+            "EmailAddr": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            }
+          }
+        },
+        "PostalAddr": {
+          "$typeName": "Addr_CType",
+          "StreetAddr": {
+            "$type": "string",
+            "$typeName": "Name_Type",
+            "$attrs": [
+              "JHANull",
+              "MaskVal",
+              "SrchType"
+            ]
+          },
+          "City": {
+            "$type": "string",
+            "$typeName": "Name_Type",
+            "$attrs": [
+              "JHANull",
+              "MaskVal",
+              "SrchType"
+            ]
+          },
+          "PostalCode": {
+            "$type": "string",
+            "$typeName": "Name_Type",
+            "$attrs": [
+              "JHANull",
+              "MaskVal",
+              "SrchType"
+            ]
+          }
+        },
+        "QuesArray": {
+          "$typeName": "QuesArray_AType",
+          "QuesRec": {
+            "$typeName": "QuesRec_CType",
+            "$array": true,
+            "QuesText": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "QuesArray": {
+              "$typeName": "QuesArray_AType",
+              "$recursive": true
+            }
+          }
+        },
+        "OpenDt": {
+          "$type": "date",
+          "$typeName": "OpenDt_Type",
+          "$attrs": [
+            "JHANull"
+          ]
+        },
+        "Custom": {
+          "$typeName": "Custom_CType",
+          "$annotation": {
+            "description": "Institution-specific extension elements"
+          }
+        }
+      },
+      "response": {
+        "AcctId": {
+          "$type": "string",
+          "$typeName": "AcctId_Type",
+          "$attrs": [
+            "JHANull",
+            "Rstr"
+          ]
+        },
+        "CollatInfo": {
+          "$typeName": "CollatInfo_CType",
+          "CollatAddr": {
+            "$typeName": "Addr_CType",
+            "StreetAddr": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "City": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "PostalCode": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            }
+          },
+          "CollatDesc": {
+            "$type": "string",
+            "$typeName": "Name_Type",
+            "$attrs": [
+              "JHANull",
+              "MaskVal",
+              "SrchType"
+            ]
+          }
+        }
+      }
+    },
+    "AcctAddValidate": {
+      "kind": "validate",
+      "requestElement": "AcctAddValidate",
+      "responseElement": "AcctAddValidateResponse",
+      "request": {
+        "AcctAdd": {
+          "$typeName": "AcctAddRq_MType",
+          "$required": true,
+          "InAcctId": {
+            "$typeName": "AccountId_CType",
+            "$required": true,
+            "AcctId": {
+              "$type": "string",
+              "$typeName": "AcctId_Type",
+              "$required": true,
+              "$attrs": [
+                "JHANull",
+                "Rstr"
+              ]
+            },
+            "AcctType": {
+              "$type": "string",
+              "$typeName": "AcctType_Type",
+              "$required": true,
+              "$attrs": [
+                "JHANull",
+                "Rstr"
+              ]
+            }
+          },
+          "ExtRec": {
+            "$typeName": "ExtRec_CType",
+            "$required": true,
+            "AcctId": {
+              "$type": "string",
+              "$typeName": "AcctId_Type",
+              "$required": true,
+              "$attrs": [
+                "JHANull",
+                "Rstr"
+              ]
+            },
+            "Bal": {
+              "$type": "decimal",
+              "$typeName": "Amt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            }
+          },
+          "EmailArray": {
+            "$typeName": "EmailArray_AType",
+            "EmailInfo": {
+              "$typeName": "EmailInfo_CType",
+              "$required": true,
+              "$array": true,
+              "EmailAddr": {
+                "$type": "string",
+                "$typeName": "Name_Type",
+                "$attrs": [
+                  "JHANull",
+                  "MaskVal",
+                  "SrchType"
+                ]
+              }
+            }
+          },
+          "PostalAddr": {
+            "$typeName": "Addr_CType",
+            "StreetAddr": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "City": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "PostalCode": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            }
+          },
+          "QuesArray": {
+            "$typeName": "QuesArray_AType",
+            "QuesRec": {
+              "$typeName": "QuesRec_CType",
+              "$array": true,
+              "QuesText": {
+                "$type": "string",
+                "$typeName": "Name_Type",
+                "$attrs": [
+                  "JHANull",
+                  "MaskVal",
+                  "SrchType"
+                ]
+              },
+              "QuesArray": {
+                "$typeName": "QuesArray_AType",
+                "$recursive": true
+              }
+            }
+          },
+          "OpenDt": {
+            "$type": "date",
+            "$typeName": "OpenDt_Type",
+            "$attrs": [
+              "JHANull"
+            ]
+          },
+          "Custom": {
+            "$typeName": "Custom_CType",
+            "$annotation": {
+              "description": "Institution-specific extension elements"
+            }
+          }
+        },
+        "ErrOvrRdInfoArray": {
+          "$typeName": "ErrOvrRdInfoArray_AType",
+          "ErrOvrRdInfo": {
+            "$typeName": "ErrOvrRdInfo_CType",
+            "$array": true,
+            "ErrCode": {
+              "$type": "string",
+              "$typeName": "RtCode_Type"
+            }
+          }
+        }
+      },
+      "response": {
+        "RsStat": {
+          "$type": "string",
+          "$typeName": "RtCode_Type"
+        }
+      }
+    },
+    "AcctInq": {
+      "kind": "inquiry",
+      "requestElement": "AcctInq",
+      "responseElement": "AcctInqResponse",
+      "extendedElements": [
+        "x_DepInfoRec",
+        "x_MailAddr",
+        "x_Misc"
+      ],
+      "request": {
+        "InAcctId": {
+          "$typeName": "AccountId_CType",
+          "$required": true,
+          "AcctId": {
+            "$type": "string",
+            "$typeName": "AcctId_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          },
+          "AcctType": {
+            "$type": "string",
+            "$typeName": "AcctType_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          }
+        },
+        "IncXtendElemArray": {
+          "$typeName": "IncXtendElem_AType",
+          "IncXtendElemInfo": {
+            "$typeName": "IncXtendElemInfo_CType",
+            "$array": true,
+            "XtendElem": {
+              "$type": "string"
+            }
+          }
+        },
+        "InqDt": {
+          "$type": "date",
+          "$annotation": {
+            "description": "Date to report balances as of"
+          }
+        }
+      },
+      "response": {
+        "AccountId": {
+          "$typeName": "AccountId_CType",
+          "AcctId": {
+            "$type": "string",
+            "$typeName": "AcctId_Type",
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          },
+          "AcctType": {
+            "$type": "string",
+            "$typeName": "AcctType_Type",
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          }
+        },
+        "DepAcctInqRec": {
+          "$typeName": "DepAcctInqRec_CType",
+          "AcctType": {
+            "$type": "string",
+            "$typeName": "AcctType_Type",
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          },
+          "Stat": {
+            "$type": "string",
+            "$typeName": "Stat_Type"
+          },
+          "SvcTier": {
+            "$type": "string",
+            "$typeName": "SvcTier_Type",
+            "$attrs": [
+              "JHANull"
+            ]
+          },
+          "HostFlag": {
+            "$type": "string",
+            "$typeName": "HostFlag_Type",
+            "$attrs": [
+              "JHANull"
+            ]
+          },
+          "BrRmk": {
+            "$type": "string",
+            "$typeName": "BrRmk_Type"
+          },
+          "x_DepInfoRec": {
+            "$typeName": "DepInfoRec_CType",
+            "Bal": {
+              "$type": "decimal",
+              "$typeName": "Amt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            },
+            "OpenDt": {
+              "$type": "date",
+              "$typeName": "OpenDt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            },
+            "DrCr": {
+              "$type": "string",
+              "$typeName": "DrCr_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            },
+            "x_Nested": {
+              "$typeName": "Misc_CType",
+              "Memo": {
+                "$type": "string"
+              },
+              "Cnt": {
+                "$type": "int",
+                "$typeName": "Cnt_Type"
+              },
+              "Num": {
+                "$type": "long",
+                "$typeName": "Num_Type"
+              },
+              "Tm": {
+                "$type": "time",
+                "$typeName": "Tm_Type"
+              },
+              "Stamp": {
+                "$type": "dateTime",
+                "$typeName": "Stamp_Type"
+              },
+              "Img": {
+                "$type": "base64Binary",
+                "$typeName": "Img_Type"
+              }
+            }
+          }
+        },
+        "x_Misc": {
+          "$typeName": "Misc_CType",
+          "Memo": {
+            "$type": "string"
+          },
+          "Cnt": {
+            "$type": "int",
+            "$typeName": "Cnt_Type"
+          },
+          "Num": {
+            "$type": "long",
+            "$typeName": "Num_Type"
+          },
+          "Tm": {
+            "$type": "time",
+            "$typeName": "Tm_Type"
+          },
+          "Stamp": {
+            "$type": "dateTime",
+            "$typeName": "Stamp_Type"
+          },
+          "Img": {
+            "$type": "base64Binary",
+            "$typeName": "Img_Type"
+          }
+        },
+        "x_MailAddr": {
+          "$typeName": "x_MailAddrInfo_CType",
+          "MailAddr": {
+            "$typeName": "Addr_CType",
+            "$array": true,
+            "StreetAddr": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "City": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            },
+            "PostalCode": {
+              "$type": "string",
+              "$typeName": "Name_Type",
+              "$attrs": [
+                "JHANull",
+                "MaskVal",
+                "SrchType"
+              ]
+            }
+          }
+        },
+        "Custom": {
+          "$typeName": "Custom_CType",
+          "$annotation": {
+            "description": "Institution-specific extension elements"
+          }
+        }
+      }
+    },
+    "AcctMod": {
+      "kind": "modify",
+      "requestElement": "AcctMod",
+      "responseElement": "AcctModResponse",
+      "modify": {
+        "containers": [
+          {
+            "name": "DepMod",
+            "sections": [
+              "DepInfoRec",
+              "EmailArray"
+            ]
+          },
+          {
+            "name": "TimeDepMod",
+            "sections": [
+              "TimeDepInfoRec"
+            ]
+          },
+          {
+            "name": "LnMod",
+            "sections": [
+              "LnInfoRec"
+            ]
+          }
+        ]
+      },
+      "request": {
+        "ErrOvrRdInfoArray": {
+          "$typeName": "ErrOvrRdInfoArray_AType",
+          "ErrOvrRdInfo": {
+            "$typeName": "ErrOvrRdInfo_CType",
+            "$array": true,
+            "ErrCode": {
+              "$type": "string",
+              "$typeName": "RtCode_Type"
+            }
+          }
+        },
+        "AccountId": {
+          "$typeName": "AccountId_CType",
+          "$required": true,
+          "AcctId": {
+            "$type": "string",
+            "$typeName": "AcctId_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          },
+          "AcctType": {
+            "$type": "string",
+            "$typeName": "AcctType_Type",
+            "$required": true,
+            "$attrs": [
+              "JHANull",
+              "Rstr"
+            ]
+          }
+        },
+        "DepMod": {
+          "$typeName": "DepMod_CType",
+          "DepInfoRec": {
+            "$typeName": "DepInfoRec_CType",
+            "Bal": {
+              "$type": "decimal",
+              "$typeName": "Amt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            },
+            "OpenDt": {
+              "$type": "date",
+              "$typeName": "OpenDt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            },
+            "DrCr": {
+              "$type": "string",
+              "$typeName": "DrCr_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            },
+            "x_Nested": {
+              "$typeName": "Misc_CType",
+              "Memo": {
+                "$type": "string"
+              },
+              "Cnt": {
+                "$type": "int",
+                "$typeName": "Cnt_Type"
+              },
+              "Num": {
+                "$type": "long",
+                "$typeName": "Num_Type"
+              },
+              "Tm": {
+                "$type": "time",
+                "$typeName": "Tm_Type"
+              },
+              "Stamp": {
+                "$type": "dateTime",
+                "$typeName": "Stamp_Type"
+              },
+              "Img": {
+                "$type": "base64Binary",
+                "$typeName": "Img_Type"
+              }
+            }
+          },
+          "EmailArray": {
+            "$typeName": "EmailArray_AType",
+            "EmailInfo": {
+              "$typeName": "EmailInfo_CType",
+              "$required": true,
+              "$array": true,
+              "EmailAddr": {
+                "$type": "string",
+                "$typeName": "Name_Type",
+                "$attrs": [
+                  "JHANull",
+                  "MaskVal",
+                  "SrchType"
+                ]
+              }
+            }
+          },
+          "Custom": {
+            "$typeName": "Custom_CType",
+            "$annotation": {
+              "description": "Institution-specific extension elements"
+            }
+          }
+        },
+        "TimeDepMod": {
+          "$typeName": "TimeDepMod_CType",
+          "TimeDepInfoRec": {
+            "$typeName": "TimeDepInfoRec_CType",
+            "Term": {
+              "$type": "int",
+              "$typeName": "Cnt_Type"
+            }
+          }
+        },
+        "LnMod": {
+          "$typeName": "LnMod_CType",
+          "MatDt": {
+            "$type": "date"
+          },
+          "LnInfoRec": {
+            "$typeName": "LnInfoRec_CType",
+            "Rate": {
+              "$type": "decimal",
+              "$typeName": "Amt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            }
+          }
+        }
+      },
+      "response": {
+        "RsStat": {
+          "$type": "string",
+          "$typeName": "RtCode_Type"
+        }
+      }
+    },
+    "AcctSrch": {
+      "kind": "search",
+      "requestElement": "AcctSrch",
+      "responseElement": "AcctSrchResponse",
+      "extendedElements": [
+        "x_Bal"
+      ],
+      "records": [
+        "AcctSrchRecArray/AcctSrchRec",
+        "FilterArray/FilterInfo"
+      ],
+      "request": {
+        "PersonName": {
+          "$type": "string",
+          "$typeName": "Name_Type",
+          "$attrs": [
+            "JHANull",
+            "MaskVal",
+            "SrchType"
+          ]
+        },
+        "IncXtendElemArray": {
+          "$typeName": "IncXtendElem_AType",
+          "IncXtendElemInfo": {
+            "$typeName": "IncXtendElemInfo_CType",
+            "$array": true,
+            "XtendElem": {
+              "$type": "string"
+            }
+          }
+        }
+      },
+      "response": {
+        "AcctSrchRecArray": {
+          "$typeName": "AcctSrchRecArray_AType",
+          "AcctSrchRec": {
+            "$typeName": "AcctSrchRec_CType",
+            "$array": true,
+            "AccountId": {
+              "$typeName": "AccountId_CType",
+              "AcctId": {
+                "$type": "string",
+                "$typeName": "AcctId_Type",
+                "$attrs": [
+                  "JHANull",
+                  "Rstr"
+                ]
+              },
+              "AcctType": {
+                "$type": "string",
+                "$typeName": "AcctType_Type",
+                "$attrs": [
+                  "JHANull",
+                  "Rstr"
+                ]
+              }
+            },
+            "x_Bal": {
+              "$type": "decimal",
+              "$typeName": "Amt_Type",
+              "$attrs": [
+                "JHANull"
+              ]
+            }
+          }
+        },
+        "FilterArray": {
+          "$typeName": "FilterArray_AType",
+          "FilterInfo": {
+            "$typeName": "FilterInfo_CType",
+            "$array": true,
+            "RtCode": {
+              "$type": "string",
+              "$typeName": "RtCode_Type"
+            }
+          }
+        }
+      }
+    },
+    "AppInfoAdd": {
+      "kind": "add",
+      "requestElement": "AppInfoAddRq",
+      "responseElement": "AppInfoAddResponse",
+      "request": {
+        "AppNote": {
+          "$type": "string",
+          "$typeName": "Name_Type",
+          "$attrs": [
+            "JHANull",
+            "MaskVal",
+            "SrchType"
+          ]
+        }
+      },
+      "response": {
+        "RsStat": {
+          "$type": "string",
+          "$typeName": "RtCode_Type"
+        }
+      }
+    },
+    "CustMod": {
+      "kind": "modify",
+      "requestElement": "CustMod",
+      "responseElement": "CustModResponse",
+      "modify": {
+        "containers": [
+          {
+            "name": null,
+            "sections": [
+              "CustDetail",
+              "RegDetail"
+            ]
+          }
+        ]
+      },
+      "request": {
+        "ErrOvrRdInfoArray": {
+          "$typeName": "ErrOvrRdInfoArray_AType",
+          "ErrOvrRdInfo": {
+            "$typeName": "ErrOvrRdInfo_CType",
+            "$array": true,
+            "ErrCode": {
+              "$type": "string",
+              "$typeName": "RtCode_Type"
+            }
+          }
+        },
+        "CustId": {
+          "$type": "string",
+          "$required": true
+        },
+        "CustDetail": {
+          "$typeName": "CustDetail_CType",
+          "PersonName": {
+            "$type": "string",
+            "$typeName": "Name_Type",
+            "$attrs": [
+              "JHANull",
+              "MaskVal",
+              "SrchType"
+            ]
+          }
+        },
+        "RegDetail": {
+          "$typeName": "RegDetail_CType",
+          "RegCode": {
+            "$type": "string",
+            "$typeName": "RtCode_Type"
+          }
+        },
+        "Dlt": {
+          "$type": "string"
+        },
+        "Custom": {
+          "$typeName": "Custom_CType",
+          "$annotation": {
+            "description": "Institution-specific extension elements"
+          }
+        }
+      },
+      "response": {
+        "RsStat": {
+          "$type": "string",
+          "$typeName": "RtCode_Type"
+        }
+      }
+    },
+    "NoRsInq": {
+      "kind": "inquiry",
+      "requestElement": "NoRsInq",
+      "request": {
+        "Note": {
+          "$type": "string"
+        }
+      },
+      "response": null
+    },
+    "Ping": {
+      "kind": "other",
+      "requestElement": "Ping",
+      "responseElement": "PingResponse",
+      "annotation": {
+        "deprecated": {
+          "date": "2099-06-30",
+          "comment": "Kept for keep-alive checks only"
+        }
+      },
+      "request": {
+        "Note": {
+          "$type": "string"
+        }
+      },
+      "response": {
+        "Note": {
+          "$type": "string"
+        }
+      }
+    }
+  },
+  "types": {
+    "AccountId_CType": {},
+    "AcctAddRq_MType": {
+      "description": "Opens an account"
+    },
+    "AcctId_Type": {
+      "base": "string",
+      "description": "Account identifier as text",
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        },
+        "Rstr": {
+          "type": "string",
+          "typeName": "Rstr_Type"
+        }
+      }
+    },
+    "AcctSrchRecArray_AType": {},
+    "AcctSrchRec_CType": {},
+    "AcctTypeBase_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "D",
+        "L",
+        "S"
+      ],
+      "description": "Kind of account"
+    },
+    "AcctType_Type": {
+      "base": "string",
+      "baseTypeName": "AcctTypeBase_Type",
+      "enum": "closed",
+      "values": [
+        "D",
+        "L",
+        "S"
+      ],
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        },
+        "Rstr": {
+          "type": "string",
+          "typeName": "Rstr_Type"
+        }
+      }
+    },
+    "Addr_CType": {},
+    "Amt_Type": {
+      "base": "decimal",
+      "description": "Amount in the account currency",
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        }
+      }
+    },
+    "BaseRec_CType": {},
+    "BrRmk_Type": {
+      "base": "string",
+      "description": "Remark a branch adds for audit"
+    },
+    "ClosedEnum_Type": {
+      "base": "string",
+      "enum": "closed",
+      "description": "Base for types with a fixed list of values"
+    },
+    "Cnt_Type": {
+      "base": "int"
+    },
+    "CollatInfo_CType": {},
+    "CustDetail_CType": {},
+    "Custom_CType": {},
+    "DepAcctInqRec_CType": {},
+    "DepInfoRec_CType": {},
+    "DepMod_CType": {},
+    "DrCrBase_Type": {
+      "base": "string",
+      "baseTypeName": "OpenEnum_Type",
+      "enum": "open",
+      "values": [
+        "Dr",
+        "Cr"
+      ],
+      "description": "Debit or credit",
+      "notes": {
+        "ElemCanocType": "Open list with known values"
+      }
+    },
+    "DrCr_Type": {
+      "base": "string",
+      "baseTypeName": "DrCrBase_Type",
+      "enum": "open",
+      "values": [
+        "Dr",
+        "Cr"
+      ],
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        }
+      }
+    },
+    "EmailArray_AType": {},
+    "EmailInfo_CType": {},
+    "ErrOvrRdInfoArray_AType": {},
+    "ErrOvrRdInfo_CType": {},
+    "ExtRec_CType": {
+      "baseTypeName": "BaseRec_CType"
+    },
+    "FilterArray_AType": {},
+    "FilterInfo_CType": {},
+    "HostFlag_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "Y",
+        "N"
+      ],
+      "description": "Flag the host sets",
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        }
+      }
+    },
+    "Img_Type": {
+      "base": "base64Binary"
+    },
+    "IncXtendElemInfo_CType": {},
+    "IncXtendElem_AType": {},
+    "JHANull_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "true",
+        "false"
+      ],
+      "description": "Asks the provider to clear the element"
+    },
+    "LnInfoRec_CType": {},
+    "LnMod_CType": {},
+    "Misc_CType": {
+      "description": "Fees & \"charges\" for café accounts"
+    },
+    "Name_Type": {
+      "base": "string",
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        },
+        "MaskVal": {
+          "type": "string"
+        },
+        "SrchType": {
+          "type": "string",
+          "typeName": "SrchType_Type"
+        }
+      }
+    },
+    "Num_Type": {
+      "base": "long"
+    },
+    "OpenDt_Type": {
+      "base": "date",
+      "description": "Date the account opened",
+      "deprecated": {
+        "date": "2099-01-01",
+        "comment": "Use OrigDt instead"
+      },
+      "providers": {
+        "Episys": {
+          "ElemRules": "Read only",
+          "ElemSPMap": "OpenDate"
+        },
+        "SilverLake": {
+          "ElemSPMap": "NA"
+        }
+      },
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        }
+      }
+    },
+    "OpenEnum_Type": {
+      "base": "string",
+      "enum": "open",
+      "description": "Base for types whose values the institution defines"
+    },
+    "QuesArray_AType": {},
+    "QuesRec_CType": {},
+    "RegDetail_CType": {},
+    "Rstr_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "ReadOnly",
+        "ReadWrite",
+        "Hidden"
+      ],
+      "description": "Controls whether a caller may change the value",
+      "default": "ReadWrite"
+    },
+    "RtCodeBase_Type": {
+      "base": "string",
+      "enum": "open",
+      "values": [
+        "AAA",
+        "BBB"
+      ]
+    },
+    "RtCode_Type": {
+      "base": "string",
+      "baseTypeName": "RtCodeBase_Type",
+      "enum": "open",
+      "values": [
+        "AAA",
+        "BBB"
+      ]
+    },
+    "SrchType_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "Exact",
+        "StartsWith"
+      ]
+    },
+    "Stamp_Type": {
+      "base": "dateTime",
+      "providers": {
+        "CoreDirector": {
+          "ElemRules": "First rule Second rule"
+        }
+      }
+    },
+    "StatBase_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "description": "Account status"
+    },
+    "Stat_Type": {
+      "base": "string",
+      "baseTypeName": "StatBase_Type",
+      "enum": "closed"
+    },
+    "SvcTier_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "Gold",
+        "Silver",
+        "Bronze"
+      ],
+      "description": "Service tier of the account",
+      "default": "Silver",
+      "providers": {
+        "Episys": {
+          "ElemSPMap": "SvcLevel"
+        }
+      },
+      "notes": {
+        "Cmnt": "Set when the account opens",
+        "Synergy": "Read from the pricing table"
+      },
+      "attributes": {
+        "JHANull": {
+          "type": "string",
+          "typeName": "JHANull_Type"
+        }
+      }
+    },
+    "TimeDepInfoRec_CType": {},
+    "TimeDepMod_CType": {},
+    "Tm_Type": {
+      "base": "time"
+    },
+    "x_MailAddrInfo_CType": {}
+  }
+}

@@ -21,7 +21,6 @@
 		"fetch:xsd:all": "node scripts/fetch-xsd.js --all",
 		"fetch:xsd:version": "node scripts/fetch-xsd.js --version",
 		"generate": "dotnet run --project src/JXSchemaGenerator.Cli -c Release -- generate --input schemas --out dist/schemas",
-		"detect": "dotnet run --project src/JXSchemaGenerator.Cli -c Release -- detect --input schemas",
 		"build": "pnpm run generate",
 		"clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
 		"test": "dotnet test --solution JXSchemaGenerator.slnx",

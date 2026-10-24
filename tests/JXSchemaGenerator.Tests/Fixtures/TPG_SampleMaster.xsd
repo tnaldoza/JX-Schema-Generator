@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="urn:jxschemagenerator:fixture" targetNamespace="urn:jxschemagenerator:fixture" elementFormDefault="qualified" version="2099.0.01">
+	<xsd:simpleType name="ClosedEnum_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Base for types with a fixed list of values</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="xsd:string" />
+	</xsd:simpleType>
+	<xsd:simpleType name="OpenEnum_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Base for types whose values the institution defines</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="xsd:string" />
+	</xsd:simpleType>
+	<xsd:simpleType name="JHANull_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Asks the provider to clear the element</ElemDesc><CanonicalVal>true,false</CanonicalVal></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="ClosedEnum_Type" />
+	</xsd:simpleType>
+	<xsd:simpleType name="Rstr_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Controls whether a caller may change the value</ElemDesc><CanonicalVal> ReadOnly, ReadWrite,,Hidden,ReadOnly </CanonicalVal><ElemDefault>ReadWrite</ElemDefault></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="ClosedEnum_Type" />
+	</xsd:simpleType>
+	<xsd:simpleType name="SrchType_Type">
+		<xsd:annotation><xsd:documentation><Jx><CanonicalVal>Exact,StartsWith</CanonicalVal></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="ClosedEnum_Type" />
+	</xsd:simpleType>
+	<xsd:simpleType name="AcctTypeBase_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Kind of account</ElemDesc><CanonicalVal>D,L,S</CanonicalVal></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="ClosedEnum_Type" />
+	</xsd:simpleType>
+	<xsd:simpleType name="DrCrBase_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Debit or credit</ElemDesc><CanonicalVal>Dr,Cr</CanonicalVal><ElemCanocType>Open list with known values</ElemCanocType></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="OpenEnum_Type" />
+	</xsd:simpleType>
+	<xsd:simpleType name="RtCodeBase_Type">
+		<xsd:annotation><xsd:documentation><Jx><CanonicalVal>AAA,BBB</CanonicalVal></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="xsd:string" />
+	</xsd:simpleType>
+	<xsd:simpleType name="StatBase_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Account status</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="ClosedEnum_Type" />
+	</xsd:simpleType>
+	<xsd:complexType name="AcctId_Type">
+		<xsd:annotation><xsd:documentation xml:lang="en">Account identifier
+			as text</xsd:documentation></xsd:annotation>
+		<xsd:simpleContent>
+			<xsd:extension base="xsd:string">
+				<xsd:attribute name="Rstr" type="Rstr_Type" use="optional" />
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="AcctType_Type">
+		<xsd:simpleContent>
+			<xsd:extension base="AcctTypeBase_Type">
+				<xsd:attribute name="Rstr" type="Rstr_Type" use="optional" />
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Amt_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Amount in the
+			account currency</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+		<xsd:simpleContent>
+			<xsd:extension base="xsd:decimal">
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="OpenDt_Type">
+		<xsd:annotation>
+			<xsd:documentation><Jx><ElemDesc>Date the account opened</ElemDesc></Jx><Deprecate><Dt>2099-01-01</Dt><Cmnt>Use OrigDt instead</Cmnt></Deprecate></xsd:documentation>
+			<xsd:documentation><SilverLake><ElemSPMap>NA</ElemSPMap></SilverLake><Episys><ElemSPMap>OpenDate</ElemSPMap><ElemRules>Read only</ElemRules></Episys></xsd:documentation>
+		</xsd:annotation>
+		<xsd:simpleContent>
+			<xsd:extension base="xsd:date">
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="DrCr_Type">
+		<xsd:simpleContent>
+			<xsd:extension base="DrCrBase_Type">
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="RtCode_Type">
+		<xsd:simpleContent><xsd:extension base="RtCodeBase_Type" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Stat_Type">
+		<xsd:simpleContent><xsd:extension base="StatBase_Type" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Name_Type">
+		<xsd:simpleContent>
+			<xsd:extension base="xsd:string">
+				<xsd:attribute name="SrchType" type="SrchType_Type" use="optional" />
+				<xsd:attribute name="MaskVal" type="xsd:string" use="optional" />
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Cnt_Type">
+		<xsd:simpleContent><xsd:extension base="xsd:int" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Num_Type">
+		<xsd:simpleContent><xsd:extension base="xsd:long" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Tm_Type">
+		<xsd:simpleContent><xsd:extension base="xsd:time" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Stamp_Type">
+		<xsd:annotation><xsd:documentation><CoreDirector><ElemRules>
+			<Rule>First rule</Rule>
+			<Rule>Second rule</Rule>
+		</ElemRules></CoreDirector></xsd:documentation></xsd:annotation>
+		<xsd:simpleContent><xsd:extension base="xsd:dateTime" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Img_Type">
+		<xsd:simpleContent><xsd:extension base="xsd:base64Binary" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="BrRmk_Type">
+		<xsd:annotation><xsd:documentation><Jx>Remark a branch adds
+			for audit</Jx></xsd:documentation></xsd:annotation>
+		<xsd:simpleContent><xsd:extension base="xsd:string" /></xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="HostFlag_Type">
+		<xsd:annotation><xsd:documentation><jx><ElemDesc>Flag the host sets</ElemDesc><CanonicalVal>Y,N</CanonicalVal></jx></xsd:documentation></xsd:annotation>
+		<xsd:simpleContent>
+			<xsd:extension base="ClosedEnum_Type">
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="SvcTier_Type">
+		<xsd:annotation>
+			<xsd:documentation>
+				<ElemDesc>Service tier of the account</ElemDesc>
+				<CanonicalVal>Gold,Silver,Bronze</CanonicalVal>
+				<ElemDefault>Silver</ElemDefault>
+				<Cmnt>Set when the account opens</Cmnt>
+				<Synergy>Read from the pricing table</Synergy>
+				<Episys><ElemSPMap>SvcLevel</ElemSPMap><ElemRules> </ElemRules></Episys>
+				<CoreDirector><ElemRules /></CoreDirector>
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:simpleContent>
+			<xsd:extension base="ClosedEnum_Type">
+				<xsd:attribute name="JHANull" type="JHANull_Type" use="optional" />
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="Ver_1_CType">
+		<xsd:annotation><xsd:documentation>Version marker</xsd:documentation></xsd:annotation>
+	</xsd:complexType>
+	<xsd:complexType name="Ver_2_CType" />
+	<xsd:complexType name="MsgRqHdr_CType">
+		<xsd:sequence><xsd:element name="jXchangeHdr" type="xsd:string" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="MsgRsHdr_CType">
+		<xsd:sequence><xsd:element name="jXchangeHdr" type="xsd:string" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="SrchMsgRqHdr_CType">
+		<xsd:sequence><xsd:element name="jXchangeHdr" type="xsd:string" /><xsd:element name="MaxRec" type="Cnt_Type" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="SrchMsgRsHdr_CType">
+		<xsd:sequence><xsd:element name="jXchangeHdr" type="xsd:string" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="AccountId_CType">
+		<xsd:sequence>
+			<xsd:element name="AcctId" type="AcctId_Type" />
+			<xsd:element name="AcctType" type="AcctType_Type" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ErrOvrRdInfo_CType">
+		<xsd:sequence><xsd:element name="ErrCode" type="RtCode_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ErrOvrRdInfoArray_AType">
+		<xsd:sequence><xsd:element name="ErrOvrRdInfo" type="ErrOvrRdInfo_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="Custom_CType">
+		<xsd:sequence><xsd:any minOccurs="0" maxOccurs="unbounded" namespace="##any" processContents="lax" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="Custom" type="Custom_CType">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Institution-specific extension elements</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+	</xsd:element>
+	<xsd:complexType name="EmailInfo_CType">
+		<xsd:sequence><xsd:element name="EmailAddr" type="Name_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="EmailArray_AType">
+		<xsd:sequence><xsd:element name="EmailInfo" type="EmailInfo_CType" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:group name="PostalGroup">
+		<xsd:sequence>
+			<xsd:element name="City" type="Name_Type" minOccurs="0" />
+			<xsd:element name="PostalCode" type="Name_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:group>
+	<xsd:complexType name="Addr_CType">
+		<xsd:sequence>
+			<xsd:element name="StreetAddr" type="Name_Type" minOccurs="0" />
+			<xsd:group ref="PostalGroup" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="BaseRec_CType">
+		<xsd:sequence><xsd:element name="AcctId" type="AcctId_Type" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ExtRec_CType">
+		<xsd:complexContent>
+			<xsd:extension base="BaseRec_CType">
+				<xsd:sequence><xsd:element name="Bal" type="Amt_Type" minOccurs="0" /></xsd:sequence>
+			</xsd:extension>
+		</xsd:complexContent>
+	</xsd:complexType>
+	<xsd:complexType name="x_MailAddrInfo_CType">
+		<xsd:sequence><xsd:element name="MailAddr" type="Addr_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="CollatInfo_CType">
+		<xsd:sequence>
+			<xsd:element name="CollatAddr" type="Addr_CType" minOccurs="0" />
+			<xsd:sequence minOccurs="0">
+				<xsd:element name="Ver_1" type="Ver_1_CType" />
+				<xsd:element name="CollatDesc" type="Name_Type" minOccurs="0" />
+				<xsd:element name="CollatAddr" type="Addr_CType" minOccurs="0" />
+			</xsd:sequence>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="QuesArray_AType">
+		<xsd:sequence><xsd:element name="QuesRec" type="QuesRec_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="QuesRec_CType">
+		<xsd:sequence>
+			<xsd:element name="QuesText" type="Name_Type" minOccurs="0" />
+			<xsd:element name="QuesArray" type="QuesArray_AType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="IncXtendElemInfo_CType">
+		<xsd:sequence><xsd:element name="XtendElem" type="xsd:string" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="IncXtendElem_AType">
+		<xsd:sequence><xsd:element name="IncXtendElemInfo" type="IncXtendElemInfo_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="Misc_CType">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Fees &amp; "charges" for caf&#233; accounts</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+		<xsd:sequence>
+			<xsd:element name="Memo" type="xsd:string" minOccurs="0" />
+			<xsd:element name="Cnt" type="Cnt_Type" minOccurs="0" />
+			<xsd:element name="Num" type="Num_Type" minOccurs="0" />
+			<xsd:element name="Tm" type="Tm_Type" minOccurs="0" />
+			<xsd:element name="Stamp" type="Stamp_Type" minOccurs="0" />
+			<xsd:element name="Img" type="Img_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="DepInfoRec_CType">
+		<xsd:sequence>
+			<xsd:element name="Bal" type="Amt_Type" minOccurs="0" />
+			<xsd:element name="OpenDt" type="OpenDt_Type" minOccurs="0" />
+			<xsd:element name="DrCr" type="DrCr_Type" minOccurs="0" />
+			<xsd:element name="x_Nested" type="Misc_CType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="DepAcctInqRec_CType">
+		<xsd:sequence>
+			<xsd:element name="AcctType" type="AcctType_Type" minOccurs="0" />
+			<xsd:element name="Stat" type="Stat_Type" minOccurs="0" />
+			<xsd:element name="SvcTier" type="SvcTier_Type" minOccurs="0" />
+			<xsd:element name="HostFlag" type="HostFlag_Type" minOccurs="0" />
+			<xsd:element name="BrRmk" type="BrRmk_Type" minOccurs="0" />
+			<xsd:element name="x_DepInfoRec" type="DepInfoRec_CType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="AcctSrchRec_CType">
+		<xsd:sequence>
+			<xsd:element name="AccountId" type="AccountId_CType" minOccurs="0" />
+			<xsd:element name="x_Bal" type="Amt_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="AcctSrchRecArray_AType">
+		<xsd:sequence><xsd:element name="AcctSrchRec" type="AcctSrchRec_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="FilterInfo_CType">
+		<xsd:sequence><xsd:element name="RtCode" type="RtCode_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="FilterArray_AType">
+		<xsd:sequence><xsd:element name="FilterInfo" type="FilterInfo_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="DepMod_CType">
+		<xsd:sequence>
+			<xsd:element name="DepInfoRec" type="DepInfoRec_CType" minOccurs="0" />
+			<xsd:element name="EmailArray" type="EmailArray_AType" minOccurs="0" />
+			<xsd:element ref="Custom" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="TimeDepInfoRec_CType">
+		<xsd:sequence><xsd:element name="Term" type="Cnt_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="TimeDepMod_CType">
+		<xsd:sequence><xsd:element name="TimeDepInfoRec" type="TimeDepInfoRec_CType" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="LnInfoRec_CType">
+		<xsd:sequence><xsd:element name="Rate" type="Amt_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="LnMod_CType">
+		<xsd:sequence>
+			<xsd:element name="MatDt" type="xsd:date" minOccurs="0" />
+			<xsd:element name="LnInfoRec" type="LnInfoRec_CType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="CustDetail_CType">
+		<xsd:sequence><xsd:element name="PersonName" type="Name_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="RegDetail_CType">
+		<xsd:sequence><xsd:element name="RegCode" type="RtCode_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctInq" type="AcctInqRq_MType" />
+	<xsd:complexType name="AcctInqRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="InAcctId" type="AccountId_CType" />
+			<xsd:element name="IncXtendElemArray" type="IncXtendElem_AType" minOccurs="0" />
+			<xsd:sequence minOccurs="0">
+				<xsd:element name="Ver_1" type="Ver_1_CType" />
+				<xsd:element name="InqDt" type="xsd:date">
+					<xsd:annotation><xsd:documentation><Jx><ElemDesc>Date to report balances as of</ElemDesc></Jx></xsd:documentation></xsd:annotation>
+				</xsd:element>
+				<xsd:sequence minOccurs="0">
+					<xsd:element name="Ver_2" type="Ver_2_CType" />
+					<xsd:any minOccurs="0" maxOccurs="unbounded" namespace="##targetNamespace" processContents="lax" />
+				</xsd:sequence>
+			</xsd:sequence>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctInqResponse" type="AcctInqRs_MType" />
+	<xsd:complexType name="AcctInqRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="AccountId" type="AccountId_CType" />
+			<xsd:element name="DepAcctInqRec" type="DepAcctInqRec_CType" />
+			<xsd:element name="x_Misc" type="Misc_CType" minOccurs="0" />
+			<xsd:element name="x_MailAddr" type="x_MailAddrInfo_CType" minOccurs="0" />
+			<xsd:element ref="Custom" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctSrch" type="AcctSrchRq_MType" />
+	<xsd:complexType name="AcctSrchRq_MType">
+		<xsd:sequence>
+			<xsd:element name="SrchMsgRqHdr" type="SrchMsgRqHdr_CType" />
+			<xsd:element name="PersonName" type="Name_Type" minOccurs="0" />
+			<xsd:element name="IncXtendElemArray" type="IncXtendElem_AType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctSrchResponse" type="AcctSrchRs_MType" />
+	<xsd:complexType name="AcctSrchRs_MType">
+		<xsd:sequence>
+			<xsd:element name="SrchMsgRsHdr" type="SrchMsgRsHdr_CType" />
+			<xsd:element name="AcctSrchRecArray" type="AcctSrchRecArray_AType" minOccurs="0" />
+			<xsd:element name="FilterArray" type="FilterArray_AType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctAdd" type="AcctAddRq_MType" />
+	<xsd:complexType name="AcctAddRq_MType">
+		<xsd:annotation><xsd:documentation>Opens an account</xsd:documentation></xsd:annotation>
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="InAcctId" type="AccountId_CType" />
+			<xsd:element name="ExtRec" type="ExtRec_CType" />
+			<xsd:element name="EmailArray" type="EmailArray_AType" minOccurs="0" />
+			<xsd:element name="PostalAddr" type="Addr_CType" minOccurs="0" />
+			<xsd:element name="QuesArray" type="QuesArray_AType" minOccurs="0" />
+			<xsd:element name="OpenDt" type="OpenDt_Type" minOccurs="0" />
+			<xsd:element ref="Custom" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctAddResponse" type="AcctAddRs_MType" />
+	<xsd:complexType name="AcctAddRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="AcctId" type="AcctId_Type" />
+			<xsd:element name="CollatInfo" type="CollatInfo_CType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctAddValidate" type="AcctAddValidateRq_MType" />
+	<xsd:complexType name="AcctAddValidateRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="AcctAdd" type="AcctAddRq_MType" />
+			<xsd:element name="ErrOvrRdInfoArray" type="ErrOvrRdInfoArray_AType" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctAddValidateResponse" type="AcctAddValidateRs_MType" />
+	<xsd:complexType name="AcctAddValidateRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="RsStat" type="RtCode_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctMod" type="AcctModRq_MType" />
+	<xsd:complexType name="AcctModRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="ErrOvrRdInfoArray" type="ErrOvrRdInfoArray_AType" minOccurs="0" />
+			<xsd:element name="AccountId" type="AccountId_CType" />
+			<xsd:element name="DepMod" type="DepMod_CType" minOccurs="0" />
+			<xsd:element name="TimeDepMod" type="TimeDepMod_CType" minOccurs="0" />
+			<xsd:sequence minOccurs="0">
+				<xsd:element name="Ver_1" type="Ver_1_CType" />
+				<xsd:element name="LnMod" type="LnMod_CType" minOccurs="0" />
+			</xsd:sequence>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AcctModResponse" type="AcctModRs_MType" />
+	<xsd:complexType name="AcctModRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="RsStat" type="RtCode_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="CustMod" type="CustModRq_MType" />
+	<xsd:complexType name="CustModRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="ErrOvrRdInfoArray" type="ErrOvrRdInfoArray_AType" minOccurs="0" />
+			<xsd:element name="CustId" type="xsd:string" />
+			<xsd:element name="CustDetail" type="CustDetail_CType" minOccurs="0" />
+			<xsd:element name="RegDetail" type="RegDetail_CType" minOccurs="0" />
+			<xsd:element name="Dlt" type="xsd:string" minOccurs="0" />
+			<xsd:element ref="Custom" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="CustModResponse" type="CustModRs_MType" />
+	<xsd:complexType name="CustModRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="RsStat" type="RtCode_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AppInfoAddRq" type="AppInfoAddRq_MType" />
+	<xsd:complexType name="AppInfoAddRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="AppNote" type="Name_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="AppInfoAddResponse" type="AppInfoAddRs_MType" />
+	<xsd:complexType name="AppInfoAddRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="RsStat" type="RtCode_Type" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="Ping" type="PingRq_MType">
+		<xsd:annotation><xsd:documentation><Deprecate><Dt>2099-06-30</Dt><Cmnt>Kept for keep-alive checks only</Cmnt></Deprecate></xsd:documentation></xsd:annotation>
+	</xsd:element>
+	<xsd:complexType name="PingRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="Note" type="xsd:string" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="PingResponse" type="PingRs_MType" />
+	<xsd:complexType name="PingRs_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
+			<xsd:element name="Note" type="xsd:string" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="NoRsInq" type="NoRsInqRq_MType" />
+	<xsd:complexType name="NoRsInqRq_MType">
+		<xsd:sequence>
+			<xsd:element name="MsgRqHdr" type="MsgRqHdr_CType" />
+			<xsd:element name="Note" type="xsd:string" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+</xsd:schema>

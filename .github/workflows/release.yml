@@ -73,7 +73,7 @@ jobs:
           tpg="${versions[0]#version=\"}"
           tpg="${tpg%\"}"
           tag="tpg-${tpg}-${GITHUB_SHA::7}"
-          # ? Sorted entries and commit-time mtimes make same-day reruns of one commit byte-identical; lastUpdated still changes daily
+          # ? Sorted entries and commit-time mtimes make reruns of one commit byte-identical
           epoch="$(git log -1 --format=%ct)"
           find dist/schemas -exec touch -d "@${epoch}" {} +
           (cd dist && find schemas -type f -print | LC_ALL=C sort | zip -X -D -q -@ ../jxchange-schemas.zip)

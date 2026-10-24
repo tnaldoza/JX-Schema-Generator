@@ -1,1 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk">
+	<ItemGroup>
+		<EmbeddedResource
+			Include="Emit\jxchange-schemas.schema.json"
+			LogicalName="jxchange-schemas.schema.json"
+		/>
+	</ItemGroup>
+</Project>

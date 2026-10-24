@@ -1,0 +1,264 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "jXchange Master, format 2",
+	"description": "One generated file per jXchange TPG Master: its operations, their request and response element trees, and the named types those trees use; optional keys are omitted when their value would be null, false or empty, and keys are written in the order listed here, except in a type entry, whose description states its order",
+	"type": "object",
+	"properties": {
+		"$schema": {
+			"description": "Relative path to this JSON Schema, which sits next to the generated files",
+			"type": "string"
+		},
+		"formatVersion": {
+			"description": "Version of this file format",
+			"const": 2
+		},
+		"tpgVersion": {
+			"description": "The Master's version attribute, or null when it has none",
+			"type": ["string", "null"]
+		},
+		"master": {
+			"description": "The Master's XSD file name",
+			"type": "string"
+		},
+		"operations": {
+			"description": "Every operation of the Master, keyed by operation name in ordinal order",
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/operation" }
+		},
+		"types": {
+			"description": "Every named schema type the element trees use, directly, through attributes or through base chains, keyed by local name in ordinal order",
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/typeEntry" }
+		}
+	},
+	"required": ["$schema", "formatVersion", "tpgVersion", "master", "operations", "types"],
+	"additionalProperties": false,
+	"$defs": {
+		"operation": {
+			"description": "One request message, its response message and the helpers derived from them",
+			"type": "object",
+			"properties": {
+				"kind": {
+					"description": "The kind read from the operation-name suffix: Validate, Inq, Srch, Add or Mod, and other for anything else",
+					"enum": ["inquiry", "search", "add", "modify", "validate", "other"]
+				},
+				"requestElement": {
+					"description": "The global request element name, the root of the SOAP request body",
+					"type": "string"
+				},
+				"responseElement": {
+					"description": "The global response element name, absent when the operation has no response",
+					"type": "string"
+				},
+				"annotation": {
+					"description": "Documentation of the request element, or else of the request type",
+					"$ref": "#/$defs/annotation"
+				},
+				"extendedElements": {
+					"description": "The x_ response elements a request can ask for through IncXtendElemArray, in ordinal order",
+					"type": "array",
+					"items": { "type": "string" },
+					"minItems": 1
+				},
+				"records": {
+					"description": "Search operations only: the repeating response records in XSD order as paths from the response root joined with /, taken from the root and the level below it, or else the shallowest repeating elements anywhere in the response; absent when nothing in the response repeats",
+					"type": "array",
+					"items": { "type": "string" },
+					"minItems": 1
+				},
+				"modify": {
+					"description": "Modify operations only: how the request divides into changeable sections",
+					"type": "object",
+					"properties": {
+						"containers": {
+							"description": "The containers in XSD order",
+							"type": "array",
+							"items": {
+								"description": "One container and the sections that can be changed inside it",
+								"type": "object",
+								"properties": {
+									"name": {
+										"description": "The container element name, or null when the sections sit directly under the request root",
+										"type": ["string", "null"]
+									},
+									"sections": {
+										"description": "The section element names in XSD order",
+										"type": "array",
+										"items": { "type": "string" }
+									}
+								},
+								"required": ["name", "sections"],
+								"additionalProperties": false
+							},
+							"minItems": 1
+						}
+					},
+					"required": ["containers"],
+					"additionalProperties": false
+				},
+				"request": {
+					"description": "The request's root elements, without message headers or version markers",
+					"$ref": "#/$defs/children"
+				},
+				"response": {
+					"description": "The response's root elements, or null when the operation has no response",
+					"anyOf": [{ "$ref": "#/$defs/children" }, { "type": "null" }]
+				}
+			},
+			"required": ["kind", "requestElement", "request", "response"],
+			"additionalProperties": false
+		},
+		"children": {
+			"description": "Elements keyed by name in XSD sequence order",
+			"type": "object",
+			"propertyNames": { "pattern": "^[^$]" },
+			"additionalProperties": { "$ref": "#/$defs/node" }
+		},
+		"node": {
+			"description": "One element, whose metadata keys start with $ and come first, followed by its child elements as ordinary keys in XSD sequence order",
+			"type": "object",
+			"properties": {
+				"$type": {
+					"description": "The built-in XSD type name of the element's text content, such as string, date or decimal, absent for elements with child elements only",
+					"type": "string"
+				},
+				"$typeName": {
+					"description": "The element's named schema type, a key of types, absent for anonymous and built-in types",
+					"type": "string"
+				},
+				"$required": {
+					"description": "Request trees only: the element must appear whenever its parent does",
+					"const": true
+				},
+				"$array": {
+					"description": "The element itself may occur more than once",
+					"const": true
+				},
+				"$recursive": {
+					"description": "The element's type is already being expanded higher up the tree, so its children are omitted",
+					"const": true
+				},
+				"$attrs": {
+					"description": "The element's attribute names in ordinal order, described under the attributes of the type named by $typeName",
+					"type": "array",
+					"items": { "type": "string" },
+					"minItems": 1
+				},
+				"$annotation": {
+					"description": "Documentation of the element, or else of the element it references, or else of its anonymous type",
+					"$ref": "#/$defs/annotation"
+				}
+			},
+			"patternProperties": { "^[^$]": { "$ref": "#/$defs/node" } },
+			"additionalProperties": false
+		},
+		"annotationFields": {
+			"description": "The documentation fields shared by annotations and type entries",
+			"type": "object",
+			"properties": {
+				"description": {
+					"description": "The description text, with whitespace runs collapsed to single spaces",
+					"type": "string"
+				},
+				"values": {
+					"description": "The canonical values, which on a type entry are the first non-empty value list along the base chain, starting with the type itself",
+					"type": "array",
+					"items": { "type": "string" },
+					"minItems": 1
+				},
+				"default": {
+					"description": "The documented default value",
+					"type": "string"
+				},
+				"deprecated": {
+					"description": "Present when the item is deprecated, even without a date or comment",
+					"type": "object",
+					"properties": {
+						"date": {
+							"description": "The deprecation date as written in the schema",
+							"type": "string"
+						},
+						"comment": {
+							"description": "The deprecation comment",
+							"type": "string"
+						}
+					},
+					"additionalProperties": false
+				},
+				"providers": {
+					"description": "Provider-specific documentation keyed by provider name in ordinal order",
+					"type": "object",
+					"additionalProperties": {
+						"description": "One provider's non-empty fields keyed by child element name in ordinal order",
+						"type": "object",
+						"additionalProperties": {
+							"description": "The field text, with whitespace runs collapsed to single spaces",
+							"type": "string"
+						},
+						"minProperties": 1
+					},
+					"minProperties": 1
+				},
+				"notes": {
+					"description": "Documentation fields other than ElemDesc, CanonicalVal and ElemDefault, inside Jx or as top-level elements without child elements, keyed by element name in ordinal order",
+					"type": "object",
+					"additionalProperties": {
+						"description": "The field text, with whitespace runs collapsed to single spaces",
+						"type": "string"
+					},
+					"minProperties": 1
+				}
+			}
+		},
+		"annotation": {
+			"description": "Documentation read from xsd:documentation",
+			"$ref": "#/$defs/annotationFields",
+			"minProperties": 1,
+			"unevaluatedProperties": false
+		},
+		"typeEntry": {
+			"description": "One named schema type, shared by every element and attribute that uses it, whose documentation fields other than values describe the type alone without anything inherited; keys are written in the order base, baseTypeName, enum, values, description, default, deprecated, providers, notes, attributes",
+			"$ref": "#/$defs/annotationFields",
+			"properties": {
+				"base": {
+					"description": "The built-in XSD type at the root of the base chain, absent for types with child elements only",
+					"type": "string"
+				},
+				"baseTypeName": {
+					"description": "The nearest named base type, a key of types",
+					"type": "string"
+				},
+				"enum": {
+					"description": "closed when values is the complete set of legal values, open when other values are allowed; only a closed list is safe to use as a closed union, and only for requests, and a closed entry can have no values, in which case clients treat it as a plain string",
+					"enum": ["closed", "open"]
+				},
+				"attributes": {
+					"description": "The type's attributes keyed by name in ordinal order",
+					"type": "object",
+					"additionalProperties": { "$ref": "#/$defs/attribute" },
+					"minProperties": 1
+				}
+			},
+			"unevaluatedProperties": false
+		},
+		"attribute": {
+			"description": "One attribute of a type",
+			"type": "object",
+			"properties": {
+				"type": {
+					"description": "The built-in XSD type name of the attribute value",
+					"type": "string"
+				},
+				"typeName": {
+					"description": "The attribute's named schema type, a key of types",
+					"type": "string"
+				},
+				"required": {
+					"description": "The attribute is declared with use=\"required\"",
+					"const": true
+				}
+			},
+			"additionalProperties": false
+		}
+	}
+}

@@ -11,3 +11,6 @@ pnpm-lock.yaml
 
 # ! Markdown belongs to markdownlint-cli2, C# and MSBuild files to CSharpier
 *.md
+
+# ! Golden output must match the generator byte for byte
+tests/JXSchemaGenerator.Tests/Fixtures/*.json

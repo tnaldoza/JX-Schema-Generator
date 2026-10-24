@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="urn:jxschemagenerator:include" targetNamespace="urn:jxschemagenerator:include" elementFormDefault="qualified">
+	<xsd:simpleType name="MemoStat_Type">
+		<xsd:restriction base="xsd:string" />
+	</xsd:simpleType>
+	<xsd:element name="MemoAdd" type="MemoAddRq_MType" />
+	<xsd:complexType name="MemoAddRq_MType">
+		<xsd:sequence><xsd:element name="Memo" type="Memo_Type" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="MemoAddResponse" type="MemoAddRs_MType" />
+	<xsd:complexType name="MemoAddRs_MType">
+		<xsd:sequence><xsd:element name="MemoStat" type="MemoStat_Type" minOccurs="0" /></xsd:sequence>
+	</xsd:complexType>
+</xsd:schema>

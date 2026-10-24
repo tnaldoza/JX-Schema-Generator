@@ -33,6 +33,9 @@ schemas/
 *.docx
 *.xlsx
 
+# ? Hand-written fixtures that reproduce TPG patterns with invented text
+!tests/JXSchemaGenerator.Tests/Fixtures/*.xsd
+
 # * Dependencies
 node_modules/
 

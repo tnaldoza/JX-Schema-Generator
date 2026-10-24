@@ -5,7 +5,7 @@ namespace JXSchemaGenerator.Schema;
 
 public static class SchemaLoader
 {
-	public sealed record LoadResult(XmlSchemaSet SchemaSet, string RootFile);
+	public sealed record LoadResult(XmlSchemaSet SchemaSet, XmlSchema RootSchema, string RootFile);
 
 	/// <summary>
 	/// Namespace prefixes whose unresolved declarations should be treated as
@@ -20,7 +20,7 @@ public static class SchemaLoader
 		"http://www.w3.org/2005/08/addressing",
 	];
 
-	public static LoadResult LoadAndCompileRoot(string folderPath, string rootXsdFileName, bool strict)
+	public static LoadResult LoadAndCompileRoot(string folderPath, string rootXsdFileName)
 	{
 		var folder = Path.GetFullPath(folderPath);
 		var rootPath = Path.Combine(folder, rootXsdFileName);
@@ -99,7 +99,7 @@ public static class SchemaLoader
 			throw new InvalidOperationException($"Schema compile failed for root '{rootXsdFileName}'. First errors:\n{string.Join("\n", errors)}{warnText}");
 		}
 
-		return new LoadResult(set, rootXsdFileName);
+		return new LoadResult(set, schema, rootXsdFileName);
 	}
 
 	/// <summary>
