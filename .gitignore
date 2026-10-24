@@ -50,6 +50,9 @@ node_modules/
 !.vscode/settings.json
 !.vscode/extensions.json
 
+# * Local design notes and plans, never committed
+docs/superpowers/
+
 # * Environment
 .env
 .env.*
