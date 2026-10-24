@@ -19,7 +19,8 @@ jobs:
     name: Scorecard analysis
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    if: ${{ github.event.repository.default_branch == github.ref_name }}
+    # ! Scorecard publishes results only for public repositories, and code scanning elsewhere needs Code Security
+    if: ${{ github.event.repository.default_branch == github.ref_name && github.event.repository.visibility == 'public' }}
     permissions:
       security-events: write # upload SARIF to code scanning
       id-token: write # sign results published to api.scorecard.dev
