@@ -51,6 +51,8 @@ Delete them by hand.
 | `responseRecordSchema`                                            | `records`, a list of paths into the full `response`                    |
 | `null` leaf                                                       | An object with `$type`, plus `$typeName` when the type is named        |
 | `isArray: true` on a wrapper                                      | `$array: true` on the repeating child                                  |
+| None                                                              | `$maxOccurs` on the repeating child, `null` when there is no limit     |
+| None                                                              | `fault`, the element nodes of the SOAP fault's `HdrFault`              |
 | Patched `XtendElem` list in `requestSchema`                       | `extendedElements`; the `XtendElem` node is a plain `string`           |
 | `entityTypes.<Key>`                                               | `modify.containers`, an array whose items carry the container `name`   |
 | `entityTypes.<Key>.modificationSections[].name`                   | `modify.containers[].sections`                                         |
@@ -66,6 +68,7 @@ An operation key is the request type name without `Rq_MType`, and `requestElemen
 A search operation's `records` lists the repeating elements of its `response`, in place of the separate `responseRecordSchema` tree.
 Each path runs from the response root with `/` between names: `Name` for a repeating element under the root, `Parent/Name` for one level below a root child, and a longer path when a search's records sit deeper.
 A client reads the record's fields from `response`, following the same path, and sees the record's full tree including `x_` elements.
+Search criteria that the response sends back, such as a filter list the request also carries, and `x_` elements are never listed as records.
 
 ### Leaves and attributes
 
@@ -79,6 +82,7 @@ Names are in `$attrs`, and their types are in `types.<typeName>.attributes`.
 An old file marked the wrapper, for example `EmailArray`, with `isArray: true`, and its single child was the item.
 Format 2 puts `$array: true` on the item, `EmailInfo`.
 The wrapper has no marker, and a client that emits `EmailArray` as one object holding a list reads the item's `$array`.
+The item also carries `$maxOccurs`, the most items a request may send, or `null` when there is no limit.
 
 ### Extended elements
 
@@ -120,13 +124,14 @@ Format 2 offers `types.<typeName>.description`, taken from the XSD, for a type t
 For `generate-types.js`:
 
 - Read the leaf type from `$type`, and the named type from `$typeName` for a union or enum.
-- Read `$array` on the item to decide that a property is a list.
+- Read `$array` on the item to decide that a property is a list, and `$maxOccurs` for its limit, where `null` means none.
 - Treat every key starting with `$` as metadata and never as a child element.
 - Read `$required` in requests only, and treat a missing `$required` as optional.
 - Turn `types.<name>.values` into a union only when `enum` is `closed`, and only for request types.
   Keep `open` lists, and `closed` types without `values`, as `string`.
 - Expect `$type` and `base` values beyond the common eight, such as `anyURI` and `integer`.
 - Stop at a node with `$recursive: true`.
+- Build the SOAP fault type from `fault` the same way as a response.
 - Skip `jxchange-schemas.schema.json` when listing files.
 
 The old per-verb entry points map to `kind`:

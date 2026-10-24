@@ -41,7 +41,7 @@ public static class OperationHelpers
 		{
 			foreach (var node in nodes)
 			{
-				if (node.Name.StartsWith(ExtendedElementPrefix, StringComparison.Ordinal))
+				if (IsExtended(node))
 					found.Add(node.Name);
 				else
 					Collect(node.Children);
@@ -55,22 +55,27 @@ public static class OperationHelpers
 	/// <remarks>
 	/// The records are the repeating elements directly under the response root or one level below its children
 	/// When those two levels hold none, the records are the shallowest repeating elements anywhere in the response
+	/// A response root child named like a request root child is the request's criteria sent back, so neither it nor anything inside it is a record
+	/// <c>x_</c> elements are optional extras, so neither they nor anything inside them is a record
 	/// </remarks>
+	/// <param name="request">The request's root children</param>
 	/// <param name="response">The response's root children, or <see langword="null"/> when the operation has none</param>
 	/// <returns>The paths from the response root in XSD order, joined with <c>/</c>, or none when nothing repeats</returns>
-	public static IReadOnlyList<string> Records(IReadOnlyList<ElementNode>? response)
+	public static IReadOnlyList<string> Records(IReadOnlyList<ElementNode> request, IReadOnlyList<ElementNode>? response)
 	{
+		var criteria = request.Select(n => n.Name).ToHashSet(StringComparer.Ordinal);
+		var roots = (response ?? []).Where(n => !criteria.Contains(n.Name) && !IsExtended(n)).ToList();
 		var records = new List<string>();
 
-		foreach (var node in response ?? [])
+		foreach (var node in roots)
 		{
 			if (node.Repeats)
 				records.Add(node.Name);
 
-			records.AddRange(node.Children.Where(c => c.Repeats).Select(c => $"{node.Name}/{c.Name}"));
+			records.AddRange(node.Children.Where(c => c.Repeats && !IsExtended(c)).Select(c => $"{node.Name}/{c.Name}"));
 		}
 
-		return records.Count > 0 ? records : ShallowestRepeating(response ?? []);
+		return records.Count > 0 ? records : ShallowestRepeating(roots);
 	}
 
 	/// <summary>
@@ -126,13 +131,15 @@ public static class OperationHelpers
 			if (repeating.Count > 0)
 				return repeating;
 
-			level = [.. level.SelectMany(e => e.Node.Children.Select(c => (Path: $"{e.Path}/{c.Name}", Node: c)))];
+			level = [.. level.SelectMany(e => e.Node.Children.Where(c => !IsExtended(c)).Select(c => (Path: $"{e.Path}/{c.Name}", Node: c)))];
 		}
 
 		return [];
 	}
 
 	private static bool IsComplex(ElementNode node) => node.BuiltInType is null;
+
+	private static bool IsExtended(ElementNode node) => node.Name.StartsWith(ExtendedElementPrefix, StringComparison.Ordinal);
 
 	private static List<string> SectionNames(IEnumerable<ElementNode> nodes) => [.. nodes.Where(IsComplex).Select(n => n.Name)];
 }

@@ -52,8 +52,64 @@ public sealed class AnnotationReaderTests
 		Assert.Equal("First rule Second rule", AnnotationReader.Read(SampleMaster.Type("Stamp_Type"))?.Providers["CoreDirector"]["ElemRules"]);
 
 	[Fact]
-	public void ReadKeepsOtherJxChildrenAsNotes() =>
-		Assert.Equal("Open list with known values", AnnotationReader.Read(SampleMaster.Type("DrCrBase_Type"))?.Notes["ElemCanocType"]);
+	public void ReadKeepsOtherJxChildrenAsNotesUnderTheirCorrectedSpelling()
+	{
+		var annotation = AnnotationReader.Read(SampleMaster.Type("DrCrBase_Type"));
+
+		Assert.NotNull(annotation);
+		string[] notes = ["ElemCanonType"];
+		Assert.Equal(notes, annotation.Notes.Keys);
+		Assert.Equal("Open list with known values", annotation.Notes["ElemCanonType"]);
+	}
+
+	[Theory]
+	[InlineData("ElemDft")]
+	[InlineData("ElemDef")]
+	[InlineData("Dft")]
+	[InlineData("default")]
+	[InlineData("Defalut")]
+	[InlineData("Defalult")]
+	public void ReadTakesTheDefaultFromEachOfItsSpellings(string field)
+	{
+		var annotation = ReadInline($"<Jx><{field}>Act</{field}></Jx>");
+
+		Assert.NotNull(annotation);
+		Assert.Equal("Act", annotation.Default);
+		Assert.Empty(annotation.Notes);
+	}
+
+	[Fact]
+	public void ReadTakesValuesFromCanonVal()
+	{
+		var annotation = ReadInline("<Jx><CanonVal>Act, InAct</CanonVal></Jx>");
+
+		Assert.NotNull(annotation);
+		string[] values = ["Act", "InAct"];
+		Assert.Equal(values, annotation.Values);
+		Assert.Empty(annotation.Notes);
+	}
+
+	[Fact]
+	public void ReadTakesADeprecationInsideJx()
+	{
+		var annotation = ReadInline("<Jx><ElemDesc>Old flag</ElemDesc><Deprecate><Dt>2099-04-01</Dt><Cmnt>Use NewFlag</Cmnt></Deprecate></Jx>");
+
+		Assert.NotNull(annotation);
+		Assert.Equal(new Deprecation("2099-04-01", "Use NewFlag"), annotation.Deprecated);
+		Assert.Empty(annotation.Notes);
+	}
+
+	[Fact]
+	public void ReadSpellsKnownProviderNamesOneWay()
+	{
+		var annotation = ReadInline("<SILVERLAKE><ElemSPMap>NA</ElemSPMap></SILVERLAKE><episys>Mapped by the host</episys>");
+
+		Assert.NotNull(annotation);
+		string[] providers = ["SilverLake"];
+		Assert.Equal(providers, annotation.Providers.Keys);
+		string[] notes = ["Episys"];
+		Assert.Equal(notes, annotation.Notes.Keys);
+	}
 
 	[Fact]
 	public void ReadKeepsEscapedAndNonAsciiCharacters() =>

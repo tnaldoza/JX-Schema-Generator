@@ -59,7 +59,19 @@ public sealed class TypeTableBuilderTests
 
 		Assert.Equal(EnumKind.Open, Table["DrCr_Type"].Enumeration);
 		Assert.Equal(values, Table["DrCr_Type"].Values);
-		Assert.Equal("Open list with known values", Table["DrCrBase_Type"].Annotation?.Notes["ElemCanocType"]);
+		Assert.Equal("Open list with known values", Table["DrCrBase_Type"].Annotation?.Notes["ElemCanonType"]);
+	}
+
+	[Fact]
+	public void ClosedEnumTakesValuesAndDefaultWrittenWithAlternateSpellings()
+	{
+		var entry = Table["TierCode_Type"];
+
+		Assert.Equal(EnumKind.Closed, entry.Enumeration);
+		string[] values = ["T1", "T2", "T3"];
+		Assert.Equal(values, entry.Values);
+		Assert.Equal("T2", entry.Annotation?.Default);
+		Assert.Equal(new Deprecation("2099-03-01", null), entry.Annotation?.Deprecated);
 	}
 
 	[Fact]

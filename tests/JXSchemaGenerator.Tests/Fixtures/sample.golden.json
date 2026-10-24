@@ -60,6 +60,7 @@
             "$typeName": "EmailInfo_CType",
             "$required": true,
             "$array": true,
+            "$maxOccurs": null,
             "EmailAddr": {
               "$type": "string",
               "$typeName": "Name_Type",
@@ -106,6 +107,7 @@
           "QuesRec": {
             "$typeName": "QuesRec_CType",
             "$array": true,
+            "$maxOccurs": null,
             "QuesText": {
               "$type": "string",
               "$typeName": "Name_Type",
@@ -244,6 +246,7 @@
               "$typeName": "EmailInfo_CType",
               "$required": true,
               "$array": true,
+              "$maxOccurs": null,
               "EmailAddr": {
                 "$type": "string",
                 "$typeName": "Name_Type",
@@ -290,6 +293,7 @@
             "QuesRec": {
               "$typeName": "QuesRec_CType",
               "$array": true,
+              "$maxOccurs": null,
               "QuesText": {
                 "$type": "string",
                 "$typeName": "Name_Type",
@@ -324,6 +328,7 @@
           "ErrOvrRdInfo": {
             "$typeName": "ErrOvrRdInfo_CType",
             "$array": true,
+            "$maxOccurs": null,
             "ErrCode": {
               "$type": "string",
               "$typeName": "RtCode_Type"
@@ -375,6 +380,7 @@
           "IncXtendElemInfo": {
             "$typeName": "IncXtendElemInfo_CType",
             "$array": true,
+            "$maxOccurs": null,
             "XtendElem": {
               "$type": "string"
             }
@@ -438,6 +444,10 @@
           "BrRmk": {
             "$type": "string",
             "$typeName": "BrRmk_Type"
+          },
+          "TierCode": {
+            "$type": "string",
+            "$typeName": "TierCode_Type"
           },
           "x_DepInfoRec": {
             "$typeName": "DepInfoRec_CType",
@@ -521,6 +531,7 @@
           "MailAddr": {
             "$typeName": "Addr_CType",
             "$array": true,
+            "$maxOccurs": null,
             "StreetAddr": {
               "$type": "string",
               "$typeName": "Name_Type",
@@ -591,6 +602,7 @@
           "ErrOvrRdInfo": {
             "$typeName": "ErrOvrRdInfo_CType",
             "$array": true,
+            "$maxOccurs": null,
             "ErrCode": {
               "$type": "string",
               "$typeName": "RtCode_Type"
@@ -677,6 +689,7 @@
               "$typeName": "EmailInfo_CType",
               "$required": true,
               "$array": true,
+              "$maxOccurs": null,
               "EmailAddr": {
                 "$type": "string",
                 "$typeName": "Name_Type",
@@ -737,8 +750,7 @@
         "x_Bal"
       ],
       "records": [
-        "AcctSrchRecArray/AcctSrchRec",
-        "FilterArray/FilterInfo"
+        "AcctSrchRecArray/AcctSrchRec"
       ],
       "request": {
         "PersonName": {
@@ -750,11 +762,24 @@
             "SrchType"
           ]
         },
+        "FilterArray": {
+          "$typeName": "FilterArray_AType",
+          "FilterInfo": {
+            "$typeName": "FilterInfo_CType",
+            "$array": true,
+            "$maxOccurs": null,
+            "RtCode": {
+              "$type": "string",
+              "$typeName": "RtCode_Type"
+            }
+          }
+        },
         "IncXtendElemArray": {
           "$typeName": "IncXtendElem_AType",
           "IncXtendElemInfo": {
             "$typeName": "IncXtendElemInfo_CType",
             "$array": true,
+            "$maxOccurs": null,
             "XtendElem": {
               "$type": "string"
             }
@@ -767,6 +792,7 @@
           "AcctSrchRec": {
             "$typeName": "AcctSrchRec_CType",
             "$array": true,
+            "$maxOccurs": null,
             "AccountId": {
               "$typeName": "AccountId_CType",
               "AcctId": {
@@ -800,6 +826,7 @@
           "FilterInfo": {
             "$typeName": "FilterInfo_CType",
             "$array": true,
+            "$maxOccurs": null,
             "RtCode": {
               "$type": "string",
               "$typeName": "RtCode_Type"
@@ -851,6 +878,7 @@
           "ErrOvrRdInfo": {
             "$typeName": "ErrOvrRdInfo_CType",
             "$array": true,
+            "$maxOccurs": null,
             "ErrCode": {
               "$type": "string",
               "$typeName": "RtCode_Type"
@@ -866,6 +894,17 @@
           "PersonName": {
             "$type": "string",
             "$typeName": "Name_Type",
+            "$attrs": [
+              "JHANull",
+              "MaskVal",
+              "SrchType"
+            ]
+          },
+          "NickName": {
+            "$type": "string",
+            "$typeName": "Name_Type",
+            "$array": true,
+            "$maxOccurs": 3,
             "$attrs": [
               "JHANull",
               "MaskVal",
@@ -924,6 +963,29 @@
       },
       "response": {
         "Note": {
+          "$type": "string"
+        }
+      }
+    }
+  },
+  "fault": {
+    "FaultHdr": {
+      "$typeName": "FaultHdr_CType",
+      "AuditUsrId": {
+        "$type": "string"
+      }
+    },
+    "FaultRecInfoArray": {
+      "$typeName": "FaultRecInfoArray_AType",
+      "FaultMsgRec": {
+        "$typeName": "FaultMsgRec_CType",
+        "$array": true,
+        "$maxOccurs": null,
+        "ErrCode": {
+          "$type": "string",
+          "$typeName": "RtCode_Type"
+        },
+        "ErrDesc": {
           "$type": "string"
         }
       }
@@ -1021,7 +1083,7 @@
       ],
       "description": "Debit or credit",
       "notes": {
-        "ElemCanocType": "Open list with known values"
+        "ElemCanonType": "Open list with known values"
       }
     },
     "DrCr_Type": {
@@ -1046,6 +1108,9 @@
     "ExtRec_CType": {
       "baseTypeName": "BaseRec_CType"
     },
+    "FaultHdr_CType": {},
+    "FaultMsgRec_CType": {},
+    "FaultRecInfoArray_AType": {},
     "FilterArray_AType": {},
     "FilterInfo_CType": {},
     "HostFlag_Type": {
@@ -1216,6 +1281,21 @@
           "type": "string",
           "typeName": "JHANull_Type"
         }
+      }
+    },
+    "TierCode_Type": {
+      "base": "string",
+      "baseTypeName": "ClosedEnum_Type",
+      "enum": "closed",
+      "values": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "description": "Pricing tier code",
+      "default": "T2",
+      "deprecated": {
+        "date": "2099-03-01"
       }
     },
     "TimeDepInfoRec_CType": {},

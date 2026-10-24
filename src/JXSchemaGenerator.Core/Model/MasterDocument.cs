@@ -32,8 +32,15 @@ public sealed record OperationModel(
 /// <param name="Master">The Master's XSD file name</param>
 /// <param name="TpgVersion">The root schema's <c>version</c> attribute, or <see langword="null"/> when it has none</param>
 /// <param name="Operations">The operations sorted by name with <see cref="StringComparer.Ordinal"/></param>
-/// <param name="Types">The named types the operations depend on, keyed by local name</param>
-public sealed record MasterDocument(string Master, string? TpgVersion, IReadOnlyList<OperationModel> Operations, IReadOnlyDictionary<string, TypeEntry> Types);
+/// <param name="Fault">The root children of the <c>HdrFault</c> element a SOAP fault carries, or <see langword="null"/> when the Master declares none</param>
+/// <param name="Types">The named types the operations and the fault depend on, keyed by local name</param>
+public sealed record MasterDocument(
+	string Master,
+	string? TpgVersion,
+	IReadOnlyList<OperationModel> Operations,
+	IReadOnlyList<ElementNode>? Fault,
+	IReadOnlyDictionary<string, TypeEntry> Types
+);
 
 /// <summary>
 /// A built Master and the warnings raised while building it

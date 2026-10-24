@@ -31,13 +31,72 @@ public sealed class OperationHelpersTests
 	[Fact]
 	public void RecordsNamesEveryRepeatingRecordUnderTheResponseRoot()
 	{
-		string[] expected = ["AcctSrchRecArray/AcctSrchRec", "FilterArray/FilterInfo"];
+		IReadOnlyList<ElementNode> response =
+		[
+			new("Key") { BuiltInType = "string" },
+			new("Item") { Repeats = true },
+			new("RecArray") { Children = [new("Rec") { Repeats = true }] },
+			new("DocArray") { Children = [new("Doc") { Repeats = true }] },
+		];
 
-		Assert.Equal(expected, OperationHelpers.Records(SampleMaster.Response("AcctSrch")));
+		string[] expected = ["Item", "RecArray/Rec", "DocArray/Doc"];
+		Assert.Equal(expected, OperationHelpers.Records([], response));
 	}
 
 	[Fact]
-	public void RecordsIsEmptyWithoutAResponse() => Assert.Empty(OperationHelpers.Records(null));
+	public void RecordsLeaveOutListsTheRequestSendsBack()
+	{
+		string[] expected = ["AcctSrchRecArray/AcctSrchRec"];
+
+		Assert.Equal(expected, OperationHelpers.Records(SampleMaster.Request("AcctSrch"), SampleMaster.Response("AcctSrch")));
+	}
+
+	[Fact]
+	public void RecordsLeaveOutXElements()
+	{
+		IReadOnlyList<ElementNode> response =
+		[
+			new("RecArray") { Children = [new("Rec") { Repeats = true }] },
+			new("x_ErrArray") { Children = [new("ErrInfo") { Repeats = true }] },
+			new("Info") { Children = [new("x_Line") { Repeats = true }] },
+		];
+
+		string[] expected = ["RecArray/Rec"];
+		Assert.Equal(expected, OperationHelpers.Records([], response));
+	}
+
+	[Fact]
+	public void RecordsFallBackPastListsTheRequestSendsBack()
+	{
+		IReadOnlyList<ElementNode> request = [new("Filter")];
+		IReadOnlyList<ElementNode> response =
+		[
+			new("Filter") { Children = [new("Mid") { Children = [new("Item") { Repeats = true }] }] },
+			new("Info") { Children = [new("Mid") { Children = [new("Rec") { Repeats = true }] }] },
+		];
+
+		string[] expected = ["Info/Mid/Rec"];
+		Assert.Equal(expected, OperationHelpers.Records(request, response));
+	}
+
+	[Fact]
+	public void RecordsFallBackPastXElements()
+	{
+		IReadOnlyList<ElementNode> response =
+		[
+			new("x_Extra") { Children = [new("Mid") { Children = [new("Item") { Repeats = true }] }] },
+			new("Info")
+			{
+				Children = [new("Mid") { Children = [new("x_Mid") { Children = [new("Line") { Repeats = true }] }, new("Rec") { Repeats = true }] }],
+			},
+		];
+
+		string[] expected = ["Info/Mid/Rec"];
+		Assert.Equal(expected, OperationHelpers.Records([], response));
+	}
+
+	[Fact]
+	public void RecordsIsEmptyWithoutAResponse() => Assert.Empty(OperationHelpers.Records([], null));
 
 	[Fact]
 	public void RecordsFallBackToTheShallowestRepeatingElementsBelowTheSecondLevel()
@@ -57,7 +116,7 @@ public sealed class OperationHelpersTests
 		];
 
 		string[] expected = ["SrchInfo/RecArray/Rec", "SrchInfo/NoteArray/Note"];
-		Assert.Equal(expected, OperationHelpers.Records(response));
+		Assert.Equal(expected, OperationHelpers.Records([], response));
 	}
 
 	[Fact]
@@ -70,12 +129,12 @@ public sealed class OperationHelpersTests
 		];
 
 		string[] expected = ["RecArray/Rec"];
-		Assert.Equal(expected, OperationHelpers.Records(response));
+		Assert.Equal(expected, OperationHelpers.Records([], response));
 	}
 
 	[Fact]
 	public void RecordsIsEmptyWhenNothingRepeats() =>
-		Assert.Empty(OperationHelpers.Records([new("Info") { Children = [new("Mid") { Children = [new("Deep") { BuiltInType = "string" }] }] }]));
+		Assert.Empty(OperationHelpers.Records([], [new("Info") { Children = [new("Mid") { Children = [new("Deep") { BuiltInType = "string" }] }] }]));
 
 	[Fact]
 	public void ModifyContainersSplitMultiContainerRequests()

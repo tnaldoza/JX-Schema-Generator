@@ -1,3 +1,5 @@
+using System.Xml;
+using System.Xml.Schema;
 using JXSchemaGenerator.Model;
 using JXSchemaGenerator.Schema;
 
@@ -8,8 +10,10 @@ namespace JXSchemaGenerator.Build;
 /// </summary>
 public static class MasterBuilder
 {
+	private const string FaultElement = "HdrFault";
+
 	/// <summary>
-	/// Discovers the operations, builds their trees and helpers, and collects the type table
+	/// Discovers the operations, builds their trees and helpers and the fault tree, and collects the type table
 	/// </summary>
 	/// <param name="loaded">The compiled Master</param>
 	/// <returns>The document and every distinct warning, in the order first raised</returns>
@@ -41,11 +45,47 @@ public static class MasterBuilder
 		foreach (var search in operations.Where(o => o.Kind == OperationKind.Search && o.Records.Count == 0))
 			Warn($"Search {search.Name} has no repeating record in its response");
 
-		var types = TypeTableBuilder.Build(operations.SelectMany(o => o.Request.Concat(o.Response ?? [])), index);
+		var fault = index.GlobalElements.GetValueOrDefault(new XmlQualifiedName(FaultElement, loaded.RootSchema.TargetNamespace))?.ElementSchemaType
+			is XmlSchemaComplexType faultType
+			? trees.BuildChildren(faultType, TreeSide.Response)
+			: null;
+
+		if (fault is null)
+			Warn($"{loaded.RootFile} declares no {FaultElement} element, so fault is null");
+
+		var types = TypeTableBuilder.Build(operations.SelectMany(o => o.Request.Concat(o.Response ?? [])).Concat(fault ?? []), index);
+
+		foreach (var spellings in ProviderSpellingConflicts(operations, fault, types.Values))
+			Warn($"Provider names {string.Join(" and ", spellings)} differ only by case; add the preferred spelling to AnnotationReader");
+
 		var version = loaded.RootSchema.Version;
-		var document = new MasterDocument(loaded.RootFile, string.IsNullOrWhiteSpace(version) ? null : version, operations, types);
+		var document = new MasterDocument(loaded.RootFile, string.IsNullOrWhiteSpace(version) ? null : version, operations, fault, types);
 
 		return new MasterBuildResult(document, warnings);
+	}
+
+	private static IEnumerable<string[]> ProviderSpellingConflicts(
+		IEnumerable<OperationModel> operations,
+		IReadOnlyList<ElementNode>? fault,
+		IEnumerable<TypeEntry> types
+	)
+	{
+		static IEnumerable<Annotation?> Annotations(ElementNode node) => node.Children.SelectMany(Annotations).Prepend(node.Annotation);
+
+		var nodes = operations.SelectMany(o => o.Request.Concat(o.Response ?? [])).Concat(fault ?? []);
+		var annotations = operations
+			.Select(o => o.Annotation)
+			.Concat(nodes.SelectMany(Annotations))
+			.Concat(types.Select(t => t.Annotation))
+			.OfType<Annotation>();
+
+		return annotations
+			.SelectMany(a => a.Providers.Keys)
+			.Distinct(StringComparer.Ordinal)
+			.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.Where(group => group.Skip(1).Any())
+			.Select(group => group.Order(StringComparer.Ordinal).ToArray())
+			.OrderBy(spellings => spellings[0], StringComparer.Ordinal);
 	}
 
 	private static OperationModel BuildOperation(OperationInfo info, ElementTreeBuilder trees)
@@ -62,7 +102,7 @@ public static class MasterBuilder
 			request,
 			response,
 			OperationHelpers.ExtendedElements(request, response),
-			info.Kind == OperationKind.Search ? OperationHelpers.Records(response) : [],
+			info.Kind == OperationKind.Search ? OperationHelpers.Records(request, response) : [],
 			info.Kind == OperationKind.Modify ? OperationHelpers.ModifyContainers(request) : []
 		);
 	}

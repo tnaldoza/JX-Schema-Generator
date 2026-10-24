@@ -1,5 +1,6 @@
 using JXSchemaGenerator.Build;
 using JXSchemaGenerator.Model;
+using JXSchemaGenerator.Schema;
 
 namespace JXSchemaGenerator.Tests.Build;
 
@@ -12,6 +13,20 @@ public sealed class MasterBuilderTests
 	private static OperationModel Operation(string name) => Result.Document.Operations.Single(o => o.Name == name);
 
 	private static IEnumerable<ElementNode> Flatten(ElementNode node) => node.Children.SelectMany(Flatten).Prepend(node);
+
+	private static SchemaLoader.LoadResult SoloInquiry(string noteDocumentation) =>
+		InlineSchema.Compile(
+			$"""
+			<xsd:complexType name="Note_Type">
+				<xsd:annotation><xsd:documentation>{noteDocumentation}</xsd:documentation></xsd:annotation>
+				<xsd:simpleContent><xsd:extension base="xsd:string" /></xsd:simpleContent>
+			</xsd:complexType>
+			<xsd:element name="SoloInq" type="SoloInqRq_MType" />
+			<xsd:complexType name="SoloInqRq_MType"><xsd:sequence><xsd:element name="Note" type="Note_Type" minOccurs="0" /></xsd:sequence></xsd:complexType>
+			<xsd:element name="SoloInqResponse" type="SoloInqRs_MType" />
+			<xsd:complexType name="SoloInqRs_MType"><xsd:sequence><xsd:element name="Note" type="Note_Type" minOccurs="0" /></xsd:sequence></xsd:complexType>
+			"""
+		);
 
 	[Fact]
 	public void BuildDescribesTheMasterAndEveryOperation()
@@ -29,7 +44,7 @@ public sealed class MasterBuilderTests
 	{
 		Assert.Equal(3, Operation("AcctInq").ExtendedElements.Count);
 		Assert.Empty(Operation("AcctInq").Records);
-		Assert.Equal(2, Operation("AcctSrch").Records.Count);
+		Assert.Single(Operation("AcctSrch").Records);
 		Assert.Equal(3, Operation("AcctMod").ModifyContainers.Count);
 		Assert.Empty(Operation("AcctAdd").ModifyContainers);
 	}
@@ -47,6 +62,7 @@ public sealed class MasterBuilderTests
 		var types = Result.Document.Types;
 		var referenced = Result
 			.Document.Operations.SelectMany(o => o.Request.Concat(o.Response ?? []))
+			.Concat(Result.Document.Fault ?? [])
 			.SelectMany(Flatten)
 			.Select(n => n.TypeName?.Name)
 			.Concat(types.Values.Select(t => t.BaseTypeName))
@@ -54,6 +70,37 @@ public sealed class MasterBuilderTests
 			.OfType<string>();
 
 		Assert.All(referenced, name => Assert.Contains(name, types.Keys));
+	}
+
+	[Fact]
+	public void BuildTakesTheFaultTreeFromTheHdrFaultElement()
+	{
+		var fault = Result.Document.Fault;
+
+		Assert.NotNull(fault);
+		string[] names = ["FaultHdr", "FaultRecInfoArray"];
+		Assert.Equal(names, fault.Select(n => n.Name));
+		Assert.True(fault.Find("FaultRecInfoArray/FaultMsgRec").Repeats);
+		Assert.Contains("FaultMsgRec_CType", Result.Document.Types.Keys);
+	}
+
+	[Fact]
+	public void BuildWarnsWhenTheMasterHasNoHdrFaultElement()
+	{
+		var result = MasterBuilder.Build(SoloInquiry("Free text"));
+
+		Assert.Null(result.Document.Fault);
+		Assert.Contains("TPG_InlineMaster.xsd declares no HdrFault element, so fault is null", result.Warnings);
+	}
+
+	[Fact]
+	public void BuildWarnsAboutUnknownProviderNamesThatDifferOnlyByCase()
+	{
+		var result = MasterBuilder.Build(
+			SoloInquiry("<AcmeCore><ElemRules>Mixed case</ElemRules></AcmeCore><ACMECORE><ElemRules>Upper case</ElemRules></ACMECORE>")
+		);
+
+		Assert.Contains("Provider names ACMECORE and AcmeCore differ only by case; add the preferred spelling to AnnotationReader", result.Warnings);
 	}
 
 	[Fact]

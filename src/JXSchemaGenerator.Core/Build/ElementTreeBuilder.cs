@@ -160,6 +160,8 @@ public sealed class ElementTreeBuilder(SchemaIndex index, Action<string> warn)
 			TypeName = anonymous || BuiltInTypes.IsBuiltIn(type.QualifiedName) ? null : type.QualifiedName,
 			Required = required,
 			Repeats = element.MaxOccurs > 1,
+			// ! unbounded compiles to decimal.MaxValue, so it and any limit beyond int range are written as no limit
+			MaxOccurs = element.MaxOccurs > 1 && element.MaxOccurs <= int.MaxValue ? (int)element.MaxOccurs : null,
 			Recursive = recursive,
 			Attributes = AttributeNames(complex),
 			Annotation = AnnotationOf(element, type, anonymous),

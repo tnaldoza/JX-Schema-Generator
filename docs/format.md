@@ -30,10 +30,11 @@ Files are UTF-8 without a byte order mark, indented with two spaces, with `\n` l
 | `tpgVersion`    | The `version` attribute of the Master's `xsd:schema`, or `null` when it has none |
 | `master`        | The Master's XSD file name                                                       |
 | `operations`    | Operations keyed by operation name, in ordinal order                             |
+| `fault`         | Element nodes of the SOAP fault; see [Fault](#fault)                             |
 | `types`         | Named types keyed by local name, in ordinal order                                |
 
 An operation name is the name of the request type without its `Rq_MType` suffix.
-`operations` and `types` are always written.
+`operations`, `fault` and `types` are always written.
 
 ## Operation keys
 
@@ -64,11 +65,13 @@ A client must treat every `$`-prefixed key as metadata and never as a child elem
 | `$typeName`   | The named type, a key of `types`; omitted for built-in and anonymous types             |
 | `$required`   | `true` when the element is required; written in requests only                          |
 | `$array`      | `true` when the element repeats                                                        |
+| `$maxOccurs`  | On every repeating element: the most occurrences allowed, or `null` when there is no limit |
 | `$recursive`  | `true` when the element's type is already being expanded above it                      |
 | `$attrs`      | Attribute names, in ordinal order                                                      |
 | `$annotation` | The element's documentation                                                            |
 
 Element nodes, `request`, `operations` and `types` are always written, so an element node can be `{}`.
+`$maxOccurs` is written exactly when `$array` is, and its `null` means no limit.
 All other keys are omitted when their value is false or empty.
 
 `$type` and `base` are open strings.
@@ -93,12 +96,14 @@ In the sample, `EmailArray` is the wrapper and `EmailInfo` is the item that repe
     "$typeName": "EmailInfo_CType",
     "$required": true,
     "$array": true,
+    "$maxOccurs": null,
     "EmailAddr": { "$type": "string", "$typeName": "Name_Type", "$attrs": ["JHANull", "MaskVal", "SrchType"] }
   }
 }
 ```
 
 A client serializes `EmailArray` as one object holding a list of `EmailInfo` items.
+`EmailInfo` has no limit, while an element declared with `maxOccurs="3"` carries `"$maxOccurs": 3`, and a client must not send more items than that.
 
 ### `$recursive`
 
@@ -110,6 +115,7 @@ In the sample, `QuesArray` appears again inside `QuesRec`:
 "QuesRec": {
   "$typeName": "QuesRec_CType",
   "$array": true,
+  "$maxOccurs": null,
   "QuesText": { "$type": "string", "$typeName": "Name_Type", "$attrs": ["JHANull", "MaskVal", "SrchType"] },
   "QuesArray": { "$typeName": "QuesArray_AType", "$recursive": true }
 }
@@ -137,13 +143,21 @@ A `<Deprecate>` element with no date and no comment is written as `"deprecated":
 ### How documentation is read
 
 - Element names are matched without regard to case, so `<jx>` counts as `<Jx>`.
-  Keys in `notes` and `providers` keep the spelling of the XSD.
 - `description` joins, in document order, the plain text of the documentation, the text of each `ElemDesc` field and the text a `Jx` element holds outside its child elements.
-- `values` comes from `CanonicalVal` fields, split at commas, and `default` from the first `ElemDefault` field.
+- `values` comes from the value fields, split at commas, and `default` from the first default field.
+  The XSDs spell these fields more than one way, and every spelling counts:
+
+  | Field     | Spellings                                                                       |
+  | --------- | ------------------------------------------------------------------------------- |
+  | `values`  | `CanonicalVal`, `CanonVal`                                                      |
+  | `default` | `ElemDefault`, `ElemDft`, `ElemDef`, `Dft`, `Default`, `Defalut`, `Defalult`    |
+
+- `deprecated` comes from the first `Deprecate` element.
 - These fields count both inside a `Jx` element and as top-level elements of the documentation.
 - Any other field inside `Jx`, and any other top-level element without child elements, is written to `notes` under its element name, and the first one of a name wins.
   A provider name used as a top-level element without child elements, such as `<Synergy>text</Synergy>`, is therefore a note.
 - A top-level element with child elements, other than `Jx` and `Deprecate`, is a provider block, and its child elements are its fields.
+- Keys in `notes` and `providers` keep the spelling of the XSD, except the names in [Provider names](#provider-names) and `ElemCanocType`, which is written as `ElemCanonType`.
 - Text that is empty after whitespace is collapsed is never written, and a provider block without a non-empty field is left out.
 
 ## Type entries
@@ -194,14 +208,31 @@ A type with neither carries no `enum` key.
 
 ## Provider names
 
-Provider names keep the spelling of the XSD, so `Silverlake` and `SilverLake` both occur.
-A client that groups by provider must treat the names as distinct strings or normalize them itself.
+The XSDs spell some provider names more than one way, such as `Silverlake` and `SilverLake`.
+These names are matched without regard to case and always written with one spelling, both as `providers` keys and as `notes` keys:
+
+`CIF2020`, `CoreDirector`, `Episys`, `RSA`, `Silhouette`, `SilverLake`, `Synapsys` and `Synergy`.
+
+Any other provider name keeps the spelling of the XSD.
+A run warns when two provider names in a Master differ only by case, so a new one can be added to the list.
+`Synergy_CU` is a separate block for credit unions, not another spelling of `Synergy`.
 In a provider block, `ElemSPMap` with the text `NA` marks an element that the provider does not support.
+
+## Fault
+
+When a call fails, jXchange answers with a SOAP fault whose detail holds one `HdrFault` element.
+`fault` holds the element nodes of `HdrFault`'s content, built the same way as a `response`, and its types are in `types`.
+It is `null` when the Master declares no `HdrFault` element, and the run then warns.
+In the TPG XSDs, `HdrFault` is the same in every Master:
+
+- `FaultHdr` sends header details back, such as `AuditUsrId`, `ConsumerName` and `jXLogTrackingId`.
+- `FaultRecInfoArray` holds a repeating `FaultMsgRec` with `ErrCode`, `ErrCat`, `ErrDesc`, `ErrElem`, `ErrElemVal` and `ErrLoc`.
 
 ## What the output leaves out
 
 - Message headers: `MsgRqHdr`, `SrchMsgRqHdr`, `MsgRsHdr` and `SrchMsgRsHdr` are not written.
-- `Ver_` markers: an element named `Ver_` followed by digits is replaced by the children of its type, so those children appear in the parent.
+- `Ver_` markers: an element named `Ver_` followed by digits is never written, in requests, responses or the fault, and any elements its type declares appear in the parent.
+  The services do not require the markers, so no key records which version added an element.
 - `xsd:any` extension points: no key stands for a wildcard.
 
 Every element can carry children that the file does not list.
@@ -224,16 +255,22 @@ A client puts these names into `IncXtendElemArray.IncXtendElemInfo.XtendElem`, w
 
 ### `records`
 
-`records` is written for `search` operations only, and lists the repeating elements of the response.
+`records` is written for `search` operations only, and lists where the response holds the rows the search found.
 A repeating element directly under the response root is listed by name, and a repeating child of a root element is listed as `Parent/Name`.
 When neither level holds a repeating element, `records` lists the shallowest repeating elements anywhere in the response instead, each as its full path from the root, such as `SrchInfo/RecArray/Rec`.
-Paths are in XSD order, joined with `/`, and point into the full `response`:
+Two kinds of element never hold records:
+
+- A response root element with the same name as a request root element is the request's search criteria sent back, so neither it nor anything inside it is a record.
+- An `x_` element is an optional extra, so neither it nor anything inside it is a record.
+
+Paths are in XSD order, joined with `/`, and point into the full `response`.
+In the sample, `AcctSrch` sends a `FilterArray` and gets it back next to its results, so only the results are listed:
 
 ```json
-"records": ["AcctSrchRecArray/AcctSrchRec", "FilterArray/FilterInfo"]
+"records": ["AcctSrchRecArray/AcctSrchRec"]
 ```
 
-`records` is omitted when nothing in the response repeats, and the run then warns `Search <name> has no repeating record in its response`.
+`records` is omitted when no record is found, and the run then warns `Search <name> has no repeating record in its response`.
 
 ### `modify.containers`
 

@@ -38,6 +38,11 @@ public sealed record ElementNode(string Name)
 	public bool Repeats { get; init; }
 
 	/// <summary>
+	/// The most occurrences allowed when the element repeats, or <see langword="null"/> when there is no limit
+	/// </summary>
+	public int? MaxOccurs { get; init; }
+
+	/// <summary>
 	/// The element's type is already being expanded higher up the tree, so its children are omitted
 	/// </summary>
 	public bool Recursive { get; init; }

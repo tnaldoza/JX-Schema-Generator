@@ -57,6 +57,24 @@ public sealed class ElementTreeBuilderTests
 	}
 
 	[Fact]
+	public void BoundedRepeatingElementsCarryTheirMaxOccurs()
+	{
+		var nickName = SampleMaster.Request("CustMod").Find("CustDetail/NickName");
+
+		Assert.True(nickName.Repeats);
+		Assert.Equal(3, nickName.MaxOccurs);
+	}
+
+	[Fact]
+	public void UnboundedRepeatingElementsHaveNoMaxOccurs()
+	{
+		var emailInfo = SampleMaster.Request("AcctAdd").Find("EmailArray/EmailInfo");
+
+		Assert.True(emailInfo.Repeats);
+		Assert.Null(emailInfo.MaxOccurs);
+	}
+
+	[Fact]
 	public void SimpleElementsCarryBuiltInTypeTypeNameAndSortedAttributes()
 	{
 		var node = SampleMaster.Request("AcctInq").Find("InAcctId/AcctType");

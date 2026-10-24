@@ -1,7 +1,7 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"title": "jXchange Master, format 2",
-	"description": "One generated file per jXchange TPG Master: its operations, their request and response element trees, and the named types those trees use; optional keys are omitted when their value would be null, false or empty, and keys are written in the order listed here, except in a type entry, whose description states its order",
+	"description": "One generated file per jXchange TPG Master: its operations, their request and response element trees, its SOAP fault tree, and the named types those trees use; optional keys are omitted when their value would be null, false or empty, except $maxOccurs, and keys are written in the order listed here, except in a type entry, whose description states its order",
 	"type": "object",
 	"properties": {
 		"$schema": {
@@ -25,13 +25,17 @@
 			"type": "object",
 			"additionalProperties": { "$ref": "#/$defs/operation" }
 		},
+		"fault": {
+			"description": "The root elements of HdrFault, the element a SOAP fault's detail carries when a call fails, built like a response; null when the Master declares no HdrFault element",
+			"anyOf": [{ "$ref": "#/$defs/children" }, { "type": "null" }]
+		},
 		"types": {
-			"description": "Every named schema type the element trees use, directly, through attributes or through base chains, keyed by local name in ordinal order",
+			"description": "Every named schema type the element trees and the fault use, directly, through attributes or through base chains, keyed by local name in ordinal order",
 			"type": "object",
 			"additionalProperties": { "$ref": "#/$defs/typeEntry" }
 		}
 	},
-	"required": ["$schema", "formatVersion", "tpgVersion", "master", "operations", "types"],
+	"required": ["$schema", "formatVersion", "tpgVersion", "master", "operations", "fault", "types"],
 	"additionalProperties": false,
 	"$defs": {
 		"operation": {
@@ -61,7 +65,7 @@
 					"minItems": 1
 				},
 				"records": {
-					"description": "Search operations only: the repeating response records in XSD order as paths from the response root joined with /, taken from the root and the level below it, or else the shallowest repeating elements anywhere in the response; absent when nothing in the response repeats",
+					"description": "Search operations only: the repeating response records in XSD order as paths from the response root joined with /, taken from the root and the level below it, or else the shallowest repeating elements anywhere in the response; a response root element named like a request root element is the request's criteria sent back and holds no records, and neither do x_ elements; absent when no record is found",
 					"type": "array",
 					"items": { "type": "string" },
 					"minItems": 1
@@ -134,6 +138,11 @@
 					"description": "The element itself may occur more than once",
 					"const": true
 				},
+				"$maxOccurs": {
+					"description": "Written exactly when $array is: the most occurrences allowed, or null when there is no limit",
+					"type": ["integer", "null"],
+					"minimum": 2
+				},
 				"$recursive": {
 					"description": "The element's type is already being expanded higher up the tree, so its children are omitted",
 					"const": true
@@ -150,6 +159,7 @@
 				}
 			},
 			"patternProperties": { "^[^$]": { "$ref": "#/$defs/node" } },
+			"dependentRequired": { "$array": ["$maxOccurs"], "$maxOccurs": ["$array"] },
 			"additionalProperties": false
 		},
 		"annotationFields": {
@@ -200,7 +210,7 @@
 					"minProperties": 1
 				},
 				"notes": {
-					"description": "Documentation fields other than ElemDesc, CanonicalVal and ElemDefault, inside Jx or as top-level elements without child elements, keyed by element name in ordinal order",
+					"description": "Documentation fields other than the description, values, default and deprecation fields, inside Jx or as top-level elements without child elements, keyed by element name in ordinal order",
 					"type": "object",
 					"additionalProperties": {
 						"description": "The field text, with whitespace runs collapsed to single spaces",

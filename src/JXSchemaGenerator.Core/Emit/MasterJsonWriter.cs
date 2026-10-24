@@ -13,6 +13,7 @@ namespace JXSchemaGenerator.Emit;
 /// Key names, key order and omission rules are the contract downstream clients generate their types from
 /// Dictionaries are written in <see cref="StringComparer.Ordinal"/> key order and element children keep XSD sequence order
 /// Optional keys are omitted when their value would be null, false or empty, and the shipped JSON Schema marks the keys that are always written
+/// ! <c>$maxOccurs</c> is the exception: every repeating node writes it, and its null means no limit
 /// </remarks>
 public static class MasterJsonWriter
 {
@@ -89,6 +90,7 @@ public static class MasterJsonWriter
 		}
 
 		writer.WriteEndObject();
+		WriteTree(writer, "fault", document.Fault);
 		writer.WriteStartObject("types");
 
 		foreach (var (name, entry) in Ordered(document.Types))
@@ -112,21 +114,21 @@ public static class MasterJsonWriter
 		WriteIfPresent(writer, "records", operation.Records);
 		WriteModify(writer, operation.ModifyContainers);
 
-		writer.WriteStartObject("request");
-		WriteNodes(writer, operation.Request);
+		WriteTree(writer, "request", operation.Request);
+		WriteTree(writer, "response", operation.Response);
 		writer.WriteEndObject();
+	}
 
-		if (operation.Response is null)
+	private static void WriteTree(Utf8JsonWriter writer, string propertyName, IReadOnlyList<ElementNode>? nodes)
+	{
+		if (nodes is null)
 		{
-			writer.WriteNull("response");
-		}
-		else
-		{
-			writer.WriteStartObject("response");
-			WriteNodes(writer, operation.Response);
-			writer.WriteEndObject();
+			writer.WriteNull(propertyName);
+			return;
 		}
 
+		writer.WriteStartObject(propertyName);
+		WriteNodes(writer, nodes);
 		writer.WriteEndObject();
 	}
 
@@ -169,12 +171,27 @@ public static class MasterJsonWriter
 			WriteIfPresent(writer, "$typeName", node.TypeName?.Name);
 			WriteIfTrue(writer, "$required", node.Required);
 			WriteIfTrue(writer, "$array", node.Repeats);
+			WriteMaxOccurs(writer, node);
 			WriteIfTrue(writer, "$recursive", node.Recursive);
 			WriteIfPresent(writer, "$attrs", node.Attributes);
 			WriteAnnotation(writer, "$annotation", node.Annotation);
 			WriteNodes(writer, node.Children);
 			writer.WriteEndObject();
 		}
+	}
+
+	/// <summary>
+	/// Writes <c>$maxOccurs</c> on every repeating node, as null when the element has no limit
+	/// </summary>
+	private static void WriteMaxOccurs(Utf8JsonWriter writer, ElementNode node)
+	{
+		if (!node.Repeats)
+			return;
+
+		if (node.MaxOccurs is { } max)
+			writer.WriteNumber("$maxOccurs", max);
+		else
+			writer.WriteNull("$maxOccurs");
 	}
 
 	private static void WriteAnnotation(Utf8JsonWriter writer, string propertyName, Annotation? annotation)

@@ -66,7 +66,7 @@
 	<xsd:complexType name="OpenDt_Type">
 		<xsd:annotation>
 			<xsd:documentation><Jx><ElemDesc>Date the account opened</ElemDesc></Jx><Deprecate><Dt>2099-01-01</Dt><Cmnt>Use OrigDt instead</Cmnt></Deprecate></xsd:documentation>
-			<xsd:documentation><SilverLake><ElemSPMap>NA</ElemSPMap></SilverLake><Episys><ElemSPMap>OpenDate</ElemSPMap><ElemRules>Read only</ElemRules></Episys></xsd:documentation>
+			<xsd:documentation><Silverlake><ElemSPMap>NA</ElemSPMap></Silverlake><Episys><ElemSPMap>OpenDate</ElemSPMap><ElemRules>Read only</ElemRules></Episys></xsd:documentation>
 		</xsd:annotation>
 		<xsd:simpleContent>
 			<xsd:extension base="xsd:date">
@@ -146,6 +146,10 @@
 			</xsd:extension>
 		</xsd:simpleContent>
 	</xsd:complexType>
+	<xsd:simpleType name="TierCode_Type">
+		<xsd:annotation><xsd:documentation><Jx><ElemDesc>Pricing tier code</ElemDesc><CanonVal>T1,T2,T3</CanonVal><ElemDft>T2</ElemDft><Deprecate><Dt>2099-03-01</Dt></Deprecate></Jx></xsd:documentation></xsd:annotation>
+		<xsd:restriction base="ClosedEnum_Type" />
+	</xsd:simpleType>
 	<xsd:complexType name="Ver_1_CType">
 		<xsd:annotation><xsd:documentation>Version marker</xsd:documentation></xsd:annotation>
 	</xsd:complexType>
@@ -262,6 +266,7 @@
 			<xsd:element name="SvcTier" type="SvcTier_Type" minOccurs="0" />
 			<xsd:element name="HostFlag" type="HostFlag_Type" minOccurs="0" />
 			<xsd:element name="BrRmk" type="BrRmk_Type" minOccurs="0" />
+			<xsd:element name="TierCode" type="TierCode_Type" minOccurs="0" />
 			<xsd:element name="x_DepInfoRec" type="DepInfoRec_CType" minOccurs="0" />
 		</xsd:sequence>
 	</xsd:complexType>
@@ -303,7 +308,10 @@
 		</xsd:sequence>
 	</xsd:complexType>
 	<xsd:complexType name="CustDetail_CType">
-		<xsd:sequence><xsd:element name="PersonName" type="Name_Type" minOccurs="0" /></xsd:sequence>
+		<xsd:sequence>
+			<xsd:element name="PersonName" type="Name_Type" minOccurs="0" />
+			<xsd:element name="NickName" type="Name_Type" minOccurs="0" maxOccurs="3" />
+		</xsd:sequence>
 	</xsd:complexType>
 	<xsd:complexType name="RegDetail_CType">
 		<xsd:sequence><xsd:element name="RegCode" type="RtCode_Type" minOccurs="0" /></xsd:sequence>
@@ -342,6 +350,7 @@
 		<xsd:sequence>
 			<xsd:element name="SrchMsgRqHdr" type="SrchMsgRqHdr_CType" />
 			<xsd:element name="PersonName" type="Name_Type" minOccurs="0" />
+			<xsd:element name="FilterArray" type="FilterArray_AType" minOccurs="0" />
 			<xsd:element name="IncXtendElemArray" type="IncXtendElem_AType" minOccurs="0" />
 		</xsd:sequence>
 	</xsd:complexType>
@@ -458,6 +467,29 @@
 		<xsd:sequence>
 			<xsd:element name="MsgRsHdr" type="MsgRsHdr_CType" />
 			<xsd:element name="Note" type="xsd:string" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="FaultHdr_CType">
+		<xsd:sequence><xsd:element name="AuditUsrId" type="xsd:string" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="FaultMsgRec_CType">
+		<xsd:sequence>
+			<xsd:element name="ErrCode" type="RtCode_Type" />
+			<xsd:element name="ErrDesc" type="xsd:string" minOccurs="0" />
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="FaultRecInfoArray_AType">
+		<xsd:sequence><xsd:element name="FaultMsgRec" type="FaultMsgRec_CType" minOccurs="0" maxOccurs="unbounded" /></xsd:sequence>
+	</xsd:complexType>
+	<xsd:element name="HdrFault" type="HdrFault_MType" />
+	<xsd:complexType name="HdrFault_MType">
+		<xsd:sequence>
+			<xsd:element name="FaultHdr" type="FaultHdr_CType" />
+			<xsd:element name="FaultRecInfoArray" type="FaultRecInfoArray_AType" minOccurs="0" />
+			<xsd:sequence minOccurs="0">
+				<xsd:element name="Ver_1" type="Ver_1_CType" />
+				<xsd:any minOccurs="0" maxOccurs="unbounded" namespace="##targetNamespace" processContents="lax" />
+			</xsd:sequence>
 		</xsd:sequence>
 	</xsd:complexType>
 	<xsd:element name="NoRsInq" type="NoRsInqRq_MType" />
