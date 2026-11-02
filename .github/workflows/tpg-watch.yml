@@ -38,7 +38,9 @@ jobs:
               echo "::error::No TPG zip links found on the Downloads page"
               exit 1
           fi
-          if gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -q "^tpg-${latest}-"; then
+          # ! grep -q stops reading at the first match, so a piped gh dies of SIGPIPE and pipefail reads that as no match
+          tags="$(gh release list --limit 100 --json tagName --jq '.[].tagName')"
+          if grep -q "^tpg-${latest}-" <<<"$tags"; then
               echo "TPG ${latest} already released"
               exit 0
           fi
