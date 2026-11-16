@@ -107,6 +107,7 @@ jobs:
           name: release-bundle
       - run: sha256sum --check --strict SHA256SUMS
       - id: attest
+        if: vars.ENABLE_ATTESTATION == 'true'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: SHA256SUMS
@@ -121,6 +122,10 @@ jobs:
               echo "::error::unexpected tag $TAG"
               exit 1
           fi
-          cp "$BUNDLE_PATH" jxchange-schemas.zip.sigstore.json
-          gh release create "$TAG" jxchange-schemas.zip SHA256SUMS jxchange-schemas.zip.sigstore.json \
+          assets=(jxchange-schemas.zip SHA256SUMS)
+          if [[ -n "$BUNDLE_PATH" ]]; then
+              cp "$BUNDLE_PATH" jxchange-schemas.zip.sigstore.json
+              assets+=(jxchange-schemas.zip.sigstore.json)
+          fi
+          gh release create "$TAG" "${assets[@]}" \
               --target "$GITHUB_SHA" --title "jXchange schemas $TAG" --notes-file notes.md --latest
